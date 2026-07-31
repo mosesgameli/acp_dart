@@ -56,6 +56,23 @@ ClientCapabilities _$ClientCapabilitiesFromJson(Map<String, dynamic> json) =>
           : ElicitationCapabilities.fromJson(
               json['elicitation'] as Map<String, dynamic>,
             ),
+      session: json['session'] == null
+          ? null
+          : ClientSessionCapabilities.fromJson(
+              json['session'] as Map<String, dynamic>,
+            ),
+      plan: json['plan'] == null
+          ? null
+          : PlanCapabilities.fromJson(json['plan'] as Map<String, dynamic>),
+      auth: json['auth'] == null
+          ? null
+          : AuthCapabilities.fromJson(json['auth'] as Map<String, dynamic>),
+      nes: json['nes'] == null
+          ? null
+          : ClientNesCapabilities.fromJson(json['nes'] as Map<String, dynamic>),
+      positionEncodings: (json['positionEncodings'] as List<dynamic>?)
+          ?.map((e) => $enumDecode(_$PositionEncodingKindEnumMap, e))
+          .toList(),
     );
 
 Map<String, dynamic> _$ClientCapabilitiesToJson(ClientCapabilities instance) =>
@@ -63,8 +80,21 @@ Map<String, dynamic> _$ClientCapabilitiesToJson(ClientCapabilities instance) =>
       '_meta': ?instance.meta,
       'fs': instance.fs,
       'terminal': instance.terminal,
+      'session': instance.session,
+      'plan': instance.plan,
+      'auth': instance.auth,
+      'nes': instance.nes,
+      'positionEncodings': instance.positionEncodings
+          ?.map((e) => _$PositionEncodingKindEnumMap[e]!)
+          .toList(),
       'elicitation': instance.elicitation,
     };
+
+const _$PositionEncodingKindEnumMap = {
+  PositionEncodingKind.utf8: 'utf-8',
+  PositionEncodingKind.utf16: 'utf-16',
+  PositionEncodingKind.utf32: 'utf-32',
+};
 
 FileSystemCapability _$FileSystemCapabilityFromJson(
   Map<String, dynamic> json,
@@ -771,16 +801,38 @@ AgentCapabilities _$AgentCapabilitiesFromJson(Map<String, dynamic> json) =>
               json['sessionCapabilities'] as Map<String, dynamic>,
             ),
       loadSession: json['loadSession'] as bool? ?? false,
+      auth: json['auth'] == null
+          ? null
+          : AgentAuthCapabilities.fromJson(
+              json['auth'] as Map<String, dynamic>,
+            ),
+      providers: json['providers'] == null
+          ? null
+          : ProvidersCapabilities.fromJson(
+              json['providers'] as Map<String, dynamic>,
+            ),
+      nes: json['nes'] == null
+          ? null
+          : NesCapabilities.fromJson(json['nes'] as Map<String, dynamic>),
+      positionEncoding: $enumDecodeNullable(
+        _$PositionEncodingKindEnumMap,
+        json['positionEncoding'],
+      ),
     );
 
-Map<String, dynamic> _$AgentCapabilitiesToJson(AgentCapabilities instance) =>
-    <String, dynamic>{
-      '_meta': ?instance.meta,
-      'mcpCapabilities': instance.mcpCapabilities,
-      'promptCapabilities': instance.promptCapabilities,
-      'sessionCapabilities': instance.sessionCapabilities,
-      'loadSession': instance.loadSession,
-    };
+Map<String, dynamic> _$AgentCapabilitiesToJson(
+  AgentCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'mcpCapabilities': instance.mcpCapabilities,
+  'promptCapabilities': instance.promptCapabilities,
+  'sessionCapabilities': instance.sessionCapabilities,
+  'loadSession': instance.loadSession,
+  'auth': instance.auth,
+  'providers': instance.providers,
+  'nes': instance.nes,
+  'positionEncoding': _$PositionEncodingKindEnumMap[instance.positionEncoding],
+};
 
 SessionCapabilities _$SessionCapabilitiesFromJson(
   Map<String, dynamic> json,
@@ -797,6 +849,21 @@ SessionCapabilities _$SessionCapabilitiesFromJson(
       : SessionResumeCapabilities.fromJson(
           json['resume'] as Map<String, dynamic>,
         ),
+  delete: json['delete'] == null
+      ? null
+      : SessionDeleteCapabilities.fromJson(
+          json['delete'] as Map<String, dynamic>,
+        ),
+  close: json['close'] == null
+      ? null
+      : SessionCloseCapabilities.fromJson(
+          json['close'] as Map<String, dynamic>,
+        ),
+  additionalDirectories: json['additionalDirectories'] == null
+      ? null
+      : SessionAdditionalDirectoriesCapabilities.fromJson(
+          json['additionalDirectories'] as Map<String, dynamic>,
+        ),
 );
 
 Map<String, dynamic> _$SessionCapabilitiesToJson(
@@ -806,6 +873,9 @@ Map<String, dynamic> _$SessionCapabilitiesToJson(
   'fork': instance.fork,
   'list': instance.list,
   'resume': instance.resume,
+  'delete': instance.delete,
+  'close': instance.close,
+  'additionalDirectories': instance.additionalDirectories,
 };
 
 SessionForkCapabilities _$SessionForkCapabilitiesFromJson(
@@ -2281,6 +2351,109 @@ Map<String, dynamic> _$ElicitationCapabilitiesToJson(
   '_meta': ?instance.meta,
   'form': instance.form,
   'url': instance.url,
+};
+
+LogoutCapabilities _$LogoutCapabilitiesFromJson(Map<String, dynamic> json) =>
+    LogoutCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$LogoutCapabilitiesToJson(LogoutCapabilities instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
+
+SessionCloseCapabilities _$SessionCloseCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => SessionCloseCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$SessionCloseCapabilitiesToJson(
+  SessionCloseCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+SessionDeleteCapabilities _$SessionDeleteCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => SessionDeleteCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$SessionDeleteCapabilitiesToJson(
+  SessionDeleteCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+SessionAdditionalDirectoriesCapabilities
+_$SessionAdditionalDirectoriesCapabilitiesFromJson(Map<String, dynamic> json) =>
+    SessionAdditionalDirectoriesCapabilities(
+      meta: json['_meta'] as Map<String, dynamic>?,
+    );
+
+Map<String, dynamic> _$SessionAdditionalDirectoriesCapabilitiesToJson(
+  SessionAdditionalDirectoriesCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+BooleanConfigOptionCapabilities _$BooleanConfigOptionCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => BooleanConfigOptionCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$BooleanConfigOptionCapabilitiesToJson(
+  BooleanConfigOptionCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+PlanCapabilities _$PlanCapabilitiesFromJson(Map<String, dynamic> json) =>
+    PlanCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$PlanCapabilitiesToJson(PlanCapabilities instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
+
+AgentAuthCapabilities _$AgentAuthCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => AgentAuthCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  logout: json['logout'] == null
+      ? null
+      : LogoutCapabilities.fromJson(json['logout'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$AgentAuthCapabilitiesToJson(
+  AgentAuthCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'logout': instance.logout};
+
+AuthCapabilities _$AuthCapabilitiesFromJson(Map<String, dynamic> json) =>
+    AuthCapabilities(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      terminal: json['terminal'] as bool? ?? false,
+    );
+
+Map<String, dynamic> _$AuthCapabilitiesToJson(AuthCapabilities instance) =>
+    <String, dynamic>{'_meta': ?instance.meta, 'terminal': instance.terminal};
+
+SessionConfigOptionsCapabilities _$SessionConfigOptionsCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => SessionConfigOptionsCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  boolean: json['boolean'] == null
+      ? null
+      : BooleanConfigOptionCapabilities.fromJson(
+          json['boolean'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$SessionConfigOptionsCapabilitiesToJson(
+  SessionConfigOptionsCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'boolean': instance.boolean};
+
+ClientSessionCapabilities _$ClientSessionCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ClientSessionCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  configOptions: json['configOptions'] == null
+      ? null
+      : SessionConfigOptionsCapabilities.fromJson(
+          json['configOptions'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$ClientSessionCapabilitiesToJson(
+  ClientSessionCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'configOptions': instance.configOptions,
 };
 
 ProviderCurrentConfig _$ProviderCurrentConfigFromJson(

@@ -187,6 +187,21 @@ class ClientCapabilities {
   @JsonKey(defaultValue: false)
   final bool terminal;
 
+  /// Session-related capabilities, such as which config option kinds render.
+  final ClientSessionCapabilities? session;
+
+  /// Present when the client can display plan updates.
+  final PlanCapabilities? plan;
+
+  /// Authentication capabilities, such as terminal-based flows.
+  final AuthCapabilities? auth;
+
+  /// NES suggestion kinds the client can act on.
+  final ClientNesCapabilities? nes;
+
+  /// Position encodings the client accepts, in order of preference.
+  final List<PositionEncodingKind>? positionEncodings;
+
   /// Elicitation modes this client can render.
   ///
   /// Omitted or `null` means the client does not support elicitation; agents
@@ -198,6 +213,11 @@ class ClientCapabilities {
     this.fs,
     this.terminal = false,
     this.elicitation,
+    this.session,
+    this.plan,
+    this.auth,
+    this.nes,
+    this.positionEncodings,
   });
 
   factory ClientCapabilities.fromJson(Map<String, dynamic> json) =>
@@ -1046,12 +1066,28 @@ class AgentCapabilities {
   @JsonKey(defaultValue: false)
   final bool loadSession;
 
+  /// Authentication capabilities, including whether `logout` is supported.
+  final AgentAuthCapabilities? auth;
+
+  /// Present when the agent supports the `providers/*` methods.
+  final ProvidersCapabilities? providers;
+
+  /// Present when the agent supports the `nes/*` methods.
+  final NesCapabilities? nes;
+
+  /// How the agent counts character offsets in [Position].
+  final PositionEncodingKind? positionEncoding;
+
   AgentCapabilities({
     this.meta,
     this.mcpCapabilities,
     this.promptCapabilities,
     this.sessionCapabilities,
     this.loadSession = false,
+    this.auth,
+    this.providers,
+    this.nes,
+    this.positionEncoding,
   });
 
   factory AgentCapabilities.fromJson(Map<String, dynamic> json) =>
@@ -1068,7 +1104,24 @@ class SessionCapabilities {
   final SessionListCapabilities? list;
   final SessionResumeCapabilities? resume;
 
-  SessionCapabilities({this.meta, this.fork, this.list, this.resume});
+  /// Present when the agent supports `session/delete`.
+  final SessionDeleteCapabilities? delete;
+
+  /// Present when the agent supports `session/close`.
+  final SessionCloseCapabilities? close;
+
+  /// Present when the agent accepts additional workspace roots.
+  final SessionAdditionalDirectoriesCapabilities? additionalDirectories;
+
+  SessionCapabilities({
+    this.meta,
+    this.fork,
+    this.list,
+    this.resume,
+    this.delete,
+    this.close,
+    this.additionalDirectories,
+  });
 
   factory SessionCapabilities.fromJson(Map<String, dynamic> json) =>
       _$SessionCapabilitiesFromJson(json);
@@ -2977,6 +3030,172 @@ class ElicitationCapabilities {
       _$ElicitationCapabilitiesFromJson(json);
 
   Map<String, dynamic> toJson() => _$ElicitationCapabilitiesToJson(this);
+}
+
+// ---------------------------------------------------------------------------
+// Capability markers
+//
+// Empty objects whose presence is the signal. Absent or null means the
+// capability is not offered.
+// ---------------------------------------------------------------------------
+
+/// How character offsets in [Position] are counted.
+enum PositionEncodingKind {
+  @JsonValue('utf-8')
+  utf8,
+  @JsonValue('utf-16')
+  utf16,
+  @JsonValue('utf-32')
+  utf32,
+}
+
+/// Agent supports `logout`.
+@JsonSerializable()
+class LogoutCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  LogoutCapabilities({this.meta});
+
+  factory LogoutCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$LogoutCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$LogoutCapabilitiesToJson(this);
+}
+
+/// Agent supports `session/close`.
+@JsonSerializable()
+class SessionCloseCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SessionCloseCapabilities({this.meta});
+
+  factory SessionCloseCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$SessionCloseCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionCloseCapabilitiesToJson(this);
+}
+
+/// Agent supports `session/delete`.
+@JsonSerializable()
+class SessionDeleteCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SessionDeleteCapabilities({this.meta});
+
+  factory SessionDeleteCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$SessionDeleteCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionDeleteCapabilitiesToJson(this);
+}
+
+/// Agent accepts additional workspace roots on session creation.
+@JsonSerializable()
+class SessionAdditionalDirectoriesCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SessionAdditionalDirectoriesCapabilities({this.meta});
+
+  factory SessionAdditionalDirectoriesCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$SessionAdditionalDirectoriesCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionAdditionalDirectoriesCapabilitiesToJson(this);
+}
+
+/// Client can render boolean session config options.
+@JsonSerializable()
+class BooleanConfigOptionCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  BooleanConfigOptionCapabilities({this.meta});
+
+  factory BooleanConfigOptionCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$BooleanConfigOptionCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BooleanConfigOptionCapabilitiesToJson(this);
+}
+
+/// Client supports plan updates.
+@JsonSerializable()
+class PlanCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  PlanCapabilities({this.meta});
+
+  factory PlanCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$PlanCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PlanCapabilitiesToJson(this);
+}
+
+/// Authentication capabilities advertised by the agent.
+@JsonSerializable()
+class AgentAuthCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final LogoutCapabilities? logout;
+
+  AgentAuthCapabilities({this.meta, this.logout});
+
+  factory AgentAuthCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$AgentAuthCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AgentAuthCapabilitiesToJson(this);
+}
+
+/// Authentication capabilities advertised by the client.
+@JsonSerializable()
+class AuthCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// Client can complete terminal-based authentication flows.
+  @JsonKey(defaultValue: false)
+  final bool terminal;
+
+  AuthCapabilities({this.meta, this.terminal = false});
+
+  factory AuthCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$AuthCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AuthCapabilitiesToJson(this);
+}
+
+/// Session config option kinds the client can render.
+@JsonSerializable()
+class SessionConfigOptionsCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final BooleanConfigOptionCapabilities? boolean;
+
+  SessionConfigOptionsCapabilities({this.meta, this.boolean});
+
+  factory SessionConfigOptionsCapabilities.fromJson(
+    Map<String, dynamic> json,
+  ) => _$SessionConfigOptionsCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() =>
+      _$SessionConfigOptionsCapabilitiesToJson(this);
+}
+
+/// Session-related capabilities advertised by the client.
+@JsonSerializable()
+class ClientSessionCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final SessionConfigOptionsCapabilities? configOptions;
+
+  ClientSessionCapabilities({this.meta, this.configOptions});
+
+  factory ClientSessionCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ClientSessionCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ClientSessionCapabilitiesToJson(this);
 }
 
 // ---------------------------------------------------------------------------
