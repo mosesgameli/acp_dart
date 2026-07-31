@@ -335,7 +335,8 @@ SetSessionConfigOptionRequest _$SetSessionConfigOptionRequestFromJson(
   meta: json['_meta'] as Map<String, dynamic>?,
   sessionId: json['sessionId'] as String,
   configId: json['configId'] as String,
-  value: json['value'] as String,
+  value: json['value'] as Object,
+  type: json['type'] as String?,
 );
 
 Map<String, dynamic> _$SetSessionConfigOptionRequestToJson(
@@ -345,6 +346,7 @@ Map<String, dynamic> _$SetSessionConfigOptionRequestToJson(
   'sessionId': instance.sessionId,
   'configId': instance.configId,
   'value': instance.value,
+  'type': ?instance.type,
 };
 
 PromptRequest _$PromptRequestFromJson(Map<String, dynamic> json) =>
@@ -1014,9 +1016,9 @@ NewSessionResponse _$NewSessionResponseFromJson(Map<String, dynamic> json) =>
     NewSessionResponse(
       meta: json['_meta'] as Map<String, dynamic>?,
       sessionId: json['sessionId'] as String,
-      configOptions: (json['configOptions'] as List<dynamic>?)
-          ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List?,
+      ),
       modes: json['modes'] == null
           ? null
           : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1029,7 +1031,9 @@ Map<String, dynamic> _$NewSessionResponseToJson(NewSessionResponse instance) =>
     <String, dynamic>{
       '_meta': ?instance.meta,
       'sessionId': instance.sessionId,
-      'configOptions': ?instance.configOptions,
+      'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+        instance.configOptions,
+      ),
       'modes': instance.modes,
       'models': instance.models,
     };
@@ -1081,34 +1085,65 @@ Map<String, dynamic> _$SessionModelStateToJson(SessionModelState instance) =>
       'currentModelId': instance.currentModelId,
     };
 
-SessionConfigOption _$SessionConfigOptionFromJson(Map<String, dynamic> json) =>
-    SessionConfigOption(
-      meta: json['_meta'] as Map<String, dynamic>?,
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      category: json['category'] as String?,
-      type: json['type'] as String? ?? 'select',
-      currentValue: json['currentValue'] as String,
-      options: const SessionConfigSelectOptionsConverter().fromJson(
-        json['options'] as List,
-      ),
-    );
+SelectSessionConfigOption _$SelectSessionConfigOptionFromJson(
+  Map<String, dynamic> json,
+) => SelectSessionConfigOption(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  id: json['id'] as String,
+  name: json['name'] as String,
+  description: json['description'] as String?,
+  category: json['category'] as String?,
+  currentValue: json['currentValue'] as String,
+  options: const SessionConfigSelectOptionsConverter().fromJson(
+    json['options'] as List,
+  ),
+);
 
-Map<String, dynamic> _$SessionConfigOptionToJson(
-  SessionConfigOption instance,
+Map<String, dynamic> _$SelectSessionConfigOptionToJson(
+  SelectSessionConfigOption instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
   'id': instance.id,
   'name': instance.name,
   'description': instance.description,
   'category': instance.category,
-  'type': instance.type,
   'currentValue': instance.currentValue,
   'options': const SessionConfigSelectOptionsConverter().toJson(
     instance.options,
   ),
 };
+
+BooleanSessionConfigOption _$BooleanSessionConfigOptionFromJson(
+  Map<String, dynamic> json,
+) => BooleanSessionConfigOption(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  id: json['id'] as String,
+  name: json['name'] as String,
+  description: json['description'] as String?,
+  category: json['category'] as String?,
+  currentValue: json['currentValue'] as bool,
+);
+
+Map<String, dynamic> _$BooleanSessionConfigOptionToJson(
+  BooleanSessionConfigOption instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'id': instance.id,
+  'name': instance.name,
+  'description': instance.description,
+  'category': instance.category,
+  'currentValue': instance.currentValue,
+};
+
+UnknownSessionConfigOption _$UnknownSessionConfigOptionFromJson(
+  Map<String, dynamic> json,
+) => UnknownSessionConfigOption(
+  rawJson: json['rawJson'] as Map<String, dynamic>,
+);
+
+Map<String, dynamic> _$UnknownSessionConfigOptionToJson(
+  UnknownSessionConfigOption instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
 
 UngroupedSessionConfigSelectOptions
 _$UngroupedSessionConfigSelectOptionsFromJson(Map<String, dynamic> json) =>
@@ -1209,9 +1244,9 @@ Map<String, dynamic> _$SessionInfoToJson(SessionInfo instance) =>
 LoadSessionResponse _$LoadSessionResponseFromJson(Map<String, dynamic> json) =>
     LoadSessionResponse(
       meta: json['_meta'] as Map<String, dynamic>?,
-      configOptions: (json['configOptions'] as List<dynamic>?)
-          ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List?,
+      ),
       modes: json['modes'] == null
           ? null
           : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1224,7 +1259,9 @@ Map<String, dynamic> _$LoadSessionResponseToJson(
   LoadSessionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': ?instance.configOptions,
+  'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
   'modes': instance.modes,
   'models': instance.models,
 };
@@ -1250,9 +1287,9 @@ Map<String, dynamic> _$ListSessionsResponseToJson(
 ForkSessionResponse _$ForkSessionResponseFromJson(Map<String, dynamic> json) =>
     ForkSessionResponse(
       meta: json['_meta'] as Map<String, dynamic>?,
-      configOptions: (json['configOptions'] as List<dynamic>?)
-          ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List?,
+      ),
       modes: json['modes'] == null
           ? null
           : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1266,7 +1303,9 @@ Map<String, dynamic> _$ForkSessionResponseToJson(
   ForkSessionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': ?instance.configOptions,
+  'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
   'modes': instance.modes,
   'models': instance.models,
   'sessionId': instance.sessionId,
@@ -1276,9 +1315,9 @@ ResumeSessionResponse _$ResumeSessionResponseFromJson(
   Map<String, dynamic> json,
 ) => ResumeSessionResponse(
   meta: json['_meta'] as Map<String, dynamic>?,
-  configOptions: (json['configOptions'] as List<dynamic>?)
-      ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-      .toList(),
+  configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+    json['configOptions'] as List?,
+  ),
   modes: json['modes'] == null
       ? null
       : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1291,7 +1330,9 @@ Map<String, dynamic> _$ResumeSessionResponseToJson(
   ResumeSessionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': ?instance.configOptions,
+  'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
   'modes': instance.modes,
   'models': instance.models,
 };
@@ -1308,16 +1349,18 @@ SetSessionConfigOptionResponse _$SetSessionConfigOptionResponseFromJson(
   Map<String, dynamic> json,
 ) => SetSessionConfigOptionResponse(
   meta: json['_meta'] as Map<String, dynamic>?,
-  configOptions: (json['configOptions'] as List<dynamic>)
-      .map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-      .toList(),
+  configOptions: const SessionConfigOptionListConverter().fromJson(
+    json['configOptions'] as List,
+  ),
 );
 
 Map<String, dynamic> _$SetSessionConfigOptionResponseToJson(
   SetSessionConfigOptionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': instance.configOptions,
+  'configOptions': const SessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
 };
 
 Usage _$UsageFromJson(Map<String, dynamic> json) => Usage(
@@ -1943,15 +1986,17 @@ Map<String, dynamic> _$CurrentModeUpdateSessionUpdateToJson(
 ConfigOptionUpdate _$ConfigOptionUpdateFromJson(Map<String, dynamic> json) =>
     ConfigOptionUpdate(
       meta: json['_meta'] as Map<String, dynamic>?,
-      configOptions: (json['configOptions'] as List<dynamic>)
-          .map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const SessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List,
+      ),
     );
 
 Map<String, dynamic> _$ConfigOptionUpdateToJson(ConfigOptionUpdate instance) =>
     <String, dynamic>{
       '_meta': ?instance.meta,
-      'configOptions': instance.configOptions,
+      'configOptions': const SessionConfigOptionListConverter().toJson(
+        instance.configOptions,
+      ),
     };
 
 SessionInfoUpdate _$SessionInfoUpdateFromJson(Map<String, dynamic> json) =>

@@ -4,6 +4,7 @@ import 'content_block_converter.dart';
 import 'embedded_resource_converter.dart';
 import 'session_update_converter.dart';
 import 'session_config_select_options_converter.dart';
+import 'session_config_option_converter.dart';
 import 'tool_call_content_converter.dart';
 import 'mcp_server_converter.dart';
 import 'request_permission_converter.dart';
@@ -487,14 +488,46 @@ class SetSessionConfigOptionRequest {
   final Map<String, dynamic>? meta;
   final SessionId sessionId;
   final SessionConfigId configId;
-  final SessionConfigValueId value;
+
+  /// A [SessionConfigValueId] for a select option, or a `bool` for a boolean
+  /// option. Prefer the [SetSessionConfigOptionRequest.select] and
+  /// [SetSessionConfigOptionRequest.boolean] constructors.
+  final Object value;
+
+  /// `'boolean'` for a boolean option; omitted for a select option, which is
+  /// the wire default.
+  @JsonKey(includeIfNull: false)
+  final String? type;
 
   SetSessionConfigOptionRequest({
     this.meta,
     required this.sessionId,
     required this.configId,
     required this.value,
+    this.type,
   });
+
+  /// Sets a select option to [value].
+  SetSessionConfigOptionRequest.select({
+    this.meta,
+    required this.sessionId,
+    required this.configId,
+    required SessionConfigValueId value,
+    // Narrows the field's `Object` type, so an initializing formal won't do.
+    // ignore: prefer_initializing_formals
+  }) : value = value,
+       type = null;
+
+  /// Sets a boolean option to [value].
+  SetSessionConfigOptionRequest.boolean({
+    this.meta,
+    required this.sessionId,
+    required this.configId,
+    required bool value,
+    // Narrows the field's `Object` type, so an initializing formal won't do.
+    // ignore: prefer_initializing_formals
+  }) : value = value,
+       type = 'boolean';
 
   factory SetSessionConfigOptionRequest.fromJson(Map<String, dynamic> json) =>
       _$SetSessionConfigOptionRequestFromJson(json);
@@ -1354,6 +1387,7 @@ class NewSessionResponse {
   final Map<String, dynamic>? meta;
   final String sessionId;
   @JsonKey(includeIfNull: false)
+  @NullableSessionConfigOptionListConverter()
   final List<SessionConfigOption>? configOptions;
   final SessionModeState? modes;
   final SessionModelState? models;
@@ -1440,35 +1474,114 @@ class SessionModelState {
   Map<String, dynamic> toJson() => _$SessionModelStateToJson(this);
 }
 
+/// Known [SessionConfigOption] categories.
+///
+/// The category is an open string union, so an agent may report others.
+abstract final class SessionConfigOptionCategories {
+  static const mode = 'mode';
+  static const model = 'model';
+  static const modelConfig = 'model_config';
+  static const thoughtLevel = 'thought_level';
+}
+
+/// A configuration option exposed by a session, discriminated on `type`.
+///
+/// Select options carry a list of choices; boolean options are a simple
+/// on/off toggle. Both share the identifying fields below.
+abstract class SessionConfigOption {
+  /// Identifies this option for `session/set_config_option`.
+  String get id;
+
+  /// Human-readable label.
+  String get name;
+  String? get description;
+
+  /// Groups related options. See [SessionConfigOptionCategories].
+  String? get category;
+}
+
+/// An option whose value is picked from a list of choices.
 @JsonSerializable()
-class SessionConfigOption {
+class SelectSessionConfigOption extends SessionConfigOption {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
+  @override
   final SessionConfigId id;
+  @override
   final String name;
+  @override
   final String? description;
+  @override
   final String? category;
-  @JsonKey(defaultValue: 'select')
-  final String type;
   final SessionConfigValueId currentValue;
   @SessionConfigSelectOptionsConverter()
   final SessionConfigSelectOptions options;
 
-  SessionConfigOption({
+  SelectSessionConfigOption({
     this.meta,
     required this.id,
     required this.name,
     this.description,
     this.category,
-    this.type = 'select',
     required this.currentValue,
     required this.options,
   });
 
-  factory SessionConfigOption.fromJson(Map<String, dynamic> json) =>
-      _$SessionConfigOptionFromJson(json);
+  factory SelectSessionConfigOption.fromJson(Map<String, dynamic> json) =>
+      _$SelectSessionConfigOptionFromJson(json);
 
-  Map<String, dynamic> toJson() => _$SessionConfigOptionToJson(this);
+  Map<String, dynamic> toJson() => _$SelectSessionConfigOptionToJson(this);
+}
+
+/// An option the user toggles on or off.
+@JsonSerializable()
+class BooleanSessionConfigOption extends SessionConfigOption {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final SessionConfigId id;
+  @override
+  final String name;
+  @override
+  final String? description;
+  @override
+  final String? category;
+  final bool currentValue;
+
+  BooleanSessionConfigOption({
+    this.meta,
+    required this.id,
+    required this.name,
+    this.description,
+    this.category,
+    required this.currentValue,
+  });
+
+  factory BooleanSessionConfigOption.fromJson(Map<String, dynamic> json) =>
+      _$BooleanSessionConfigOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BooleanSessionConfigOptionToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised config option types.
+@JsonSerializable()
+class UnknownSessionConfigOption extends SessionConfigOption {
+  final Map<String, dynamic> rawJson;
+  UnknownSessionConfigOption({required this.rawJson});
+
+  @override
+  String get id => (rawJson['id'] as String?) ?? '';
+  @override
+  String get name => (rawJson['name'] as String?) ?? '';
+  @override
+  String? get description => rawJson['description'] as String?;
+  @override
+  String? get category => rawJson['category'] as String?;
+
+  factory UnknownSessionConfigOption.fromJson(Map<String, dynamic> json) =>
+      _$UnknownSessionConfigOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$UnknownSessionConfigOptionToJson(this);
 }
 
 abstract class SessionConfigSelectOptions {}
@@ -1598,6 +1711,7 @@ class LoadSessionResponse {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
   @JsonKey(includeIfNull: false)
+  @NullableSessionConfigOptionListConverter()
   final List<SessionConfigOption>? configOptions;
   final SessionModeState? modes;
   final SessionModelState? models;
@@ -1614,6 +1728,7 @@ abstract class SessionStateResponseBase {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
   @JsonKey(includeIfNull: false)
+  @NullableSessionConfigOptionListConverter()
   final List<SessionConfigOption>? configOptions;
   final SessionModeState? modes;
   final SessionModelState? models;
@@ -1691,6 +1806,7 @@ class SetSessionModeResponse {
 class SetSessionConfigOptionResponse {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
+  @SessionConfigOptionListConverter()
   final List<SessionConfigOption> configOptions;
 
   SetSessionConfigOptionResponse({this.meta, required this.configOptions});
@@ -2480,6 +2596,7 @@ class CurrentModeUpdateSessionUpdate extends SessionUpdate {
 class ConfigOptionUpdate extends SessionUpdate {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
+  @SessionConfigOptionListConverter()
   final List<SessionConfigOption> configOptions;
 
   ConfigOptionUpdate({this.meta, required this.configOptions});

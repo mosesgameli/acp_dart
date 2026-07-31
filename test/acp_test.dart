@@ -1153,7 +1153,10 @@ void main() {
 
         final response = await future;
         expect(response.configOptions.first.id, equals('mode'));
-        expect(response.configOptions.first.currentValue, equals('code'));
+        // currentValue lives on the concrete variant, not the base.
+        final option =
+            response.configOptions.first as SelectSessionConfigOption;
+        expect(option.currentValue, equals('code'));
       },
     );
 
@@ -1772,11 +1775,11 @@ class ConfigurableMockAgent extends MockAgent
     lastSetConfigRequest = params;
     return SetSessionConfigOptionResponse(
       configOptions: [
-        SessionConfigOption(
+        SelectSessionConfigOption(
           id: params.configId,
           name: 'Session Mode',
           category: 'mode',
-          currentValue: params.value,
+          currentValue: params.value as String,
           options: UngroupedSessionConfigSelectOptions(
             options: [
               SessionConfigSelectOption(value: 'ask', name: 'Ask'),

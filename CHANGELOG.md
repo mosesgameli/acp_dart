@@ -36,8 +36,35 @@ stage, so their shapes may change. Pin a version if you depend on them.
   `ClientNesCapabilities` for what suggestion kinds a client can act on.
   Also adds `WorkspaceFolder`.
 
+### Fixed
+
+- **Capability negotiation:** `ProvidersCapabilities`, `NesCapabilities`, and
+  `ClientNesCapabilities` existed as types but were never attached to
+  `AgentCapabilities` or `ClientCapabilities`, so the provider and NES methods
+  were dispatched yet undiscoverable — no peer could learn they were
+  supported. Adds `auth`/`providers`/`nes`/`positionEncoding` to
+  `AgentCapabilities`, `session`/`plan`/`auth`/`nes`/`positionEncodings` to
+  `ClientCapabilities`, and `delete`/`close`/`additionalDirectories` to
+  `SessionCapabilities`, plus `PositionEncodingKind` and the supporting
+  capability types.
+- **Boolean session config options:** `SessionConfigOption` was select-only —
+  `options` was required and `currentValue` was a `String`, so a
+  `type: "boolean"` option could not be represented at all. It is now a union
+  over `SelectSessionConfigOption` and `BooleanSessionConfigOption` with an
+  `UnknownSessionConfigOption` fallback. An option arriving without a `type`
+  is read as select, since agents predating the boolean variant omit the
+  field. Adds `SessionConfigOptionCategories` for the known category values.
+
 ### Compatibility Notes
 
+- **Breaking — `SessionConfigOption` is now abstract.** Construct
+  `SelectSessionConfigOption` instead, and cast before reading `currentValue`
+  or `options`, which live on the concrete variants. The `type` argument is
+  gone; the converter supplies the discriminator.
+- **Breaking — `SetSessionConfigOptionRequest.value` is `Object`** rather than
+  `String`, so it can carry a bool. Existing call sites passing a String still
+  compile; reading `.value` as a String needs a cast. Prefer the new
+  `.select()` and `.boolean()` constructors.
 - **Breaking for `implements`:** As in 0.5.0, adding members to the `Agent`
   and `Client` interfaces breaks implementors using `implements`, which
   requires every member to be declared. Every new member carries a `=> null`
