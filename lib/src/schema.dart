@@ -2224,12 +2224,16 @@ abstract class ToolCallContent {}
 class ContentToolCallContent extends ToolCallContent {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
-  @JsonKey(name: 'type', defaultValue: 'content')
-  final String type = 'content';
+  @JsonKey(name: 'type')
+  final String type;
   @ContentBlockConverter()
   final ContentBlock content;
 
-  ContentToolCallContent({this.meta, required this.content});
+  ContentToolCallContent({
+    this.meta,
+    required this.content,
+    this.type = 'content',
+  });
 
   factory ContentToolCallContent.fromJson(Map<String, dynamic> json) =>
       _$ContentToolCallContentFromJson(json);
@@ -2241,8 +2245,8 @@ class ContentToolCallContent extends ToolCallContent {
 class DiffToolCallContent extends ToolCallContent {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
-  @JsonKey(name: 'type', defaultValue: 'diff')
-  final String type = 'diff';
+  @JsonKey(name: 'type')
+  final String type;
   final String newText;
   final String? oldText;
   final String path;
@@ -2252,6 +2256,7 @@ class DiffToolCallContent extends ToolCallContent {
     required this.newText,
     this.oldText,
     required this.path,
+    this.type = 'diff',
   });
 
   factory DiffToolCallContent.fromJson(Map<String, dynamic> json) =>
@@ -2264,11 +2269,15 @@ class DiffToolCallContent extends ToolCallContent {
 class TerminalToolCallContent extends ToolCallContent {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
-  @JsonKey(name: 'type', defaultValue: 'terminal')
-  final String type = 'terminal';
+  @JsonKey(name: 'type')
+  final String type;
   final String terminalId;
 
-  TerminalToolCallContent({this.meta, required this.terminalId});
+  TerminalToolCallContent({
+    this.meta,
+    required this.terminalId,
+    this.type = 'terminal',
+  });
 
   factory TerminalToolCallContent.fromJson(Map<String, dynamic> json) =>
       _$TerminalToolCallContentFromJson(json);

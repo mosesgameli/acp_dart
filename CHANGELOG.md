@@ -54,6 +54,19 @@ stage, so their shapes may change. Pin a version if you depend on them.
   `UnknownSessionConfigOption` fallback. An option arriving without a `type`
   is read as select, since agents predating the boolean variant omit the
   field. Adds `SessionConfigOptionCategories` for the known category values.
+- **ToolCallContent serialisation:** all three variants declared their `type`
+  discriminator as a plain final field with an initialiser instead of a
+  constructor parameter, so `json_serializable` treated it as non-settable
+  state and left it out of `toJson`. Every `ToolCallContent` therefore crossed
+  the wire without its discriminator, and the receiving
+  `ToolCallContentConverter` threw `Unknown ToolCallContent type: null`. In
+  practice no agent could report tool output, propose a diff, or reference a
+  terminal to any client. `ContentBlock` was unaffected because its variants
+  already take `type` as a constructor parameter with a default, which is now
+  the pattern here too. Adds `test/union_round_trip_test.dart`, covering every
+  discriminated union in both directions: the existing union tests only parsed
+  hand-written JSON, which always carries a `type`, so a variant that failed to
+  emit one was invisible to them.
 
 ### Compatibility Notes
 

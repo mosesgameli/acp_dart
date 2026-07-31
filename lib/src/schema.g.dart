@@ -1684,12 +1684,14 @@ ContentToolCallContent _$ContentToolCallContentFromJson(
   content: const ContentBlockConverter().fromJson(
     json['content'] as Map<String, dynamic>,
   ),
+  type: json['type'] as String? ?? 'content',
 );
 
 Map<String, dynamic> _$ContentToolCallContentToJson(
   ContentToolCallContent instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
+  'type': instance.type,
   'content': const ContentBlockConverter().toJson(instance.content),
 };
 
@@ -1699,12 +1701,14 @@ DiffToolCallContent _$DiffToolCallContentFromJson(Map<String, dynamic> json) =>
       newText: json['newText'] as String,
       oldText: json['oldText'] as String?,
       path: json['path'] as String,
+      type: json['type'] as String? ?? 'diff',
     );
 
 Map<String, dynamic> _$DiffToolCallContentToJson(
   DiffToolCallContent instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
+  'type': instance.type,
   'newText': instance.newText,
   'oldText': instance.oldText,
   'path': instance.path,
@@ -1715,12 +1719,14 @@ TerminalToolCallContent _$TerminalToolCallContentFromJson(
 ) => TerminalToolCallContent(
   meta: json['_meta'] as Map<String, dynamic>?,
   terminalId: json['terminalId'] as String,
+  type: json['type'] as String? ?? 'terminal',
 );
 
 Map<String, dynamic> _$TerminalToolCallContentToJson(
   TerminalToolCallContent instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
+  'type': instance.type,
   'terminalId': instance.terminalId,
 };
 
