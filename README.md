@@ -2,6 +2,8 @@
 
 [![pub](https://img.shields.io/pub/v/acp_dart)](https://pub.dev/packages/acp_dart)
 [![Mintlify Docs](https://img.shields.io/badge/Mintlify-Docs-blue)](https://mintlify.wiki/SkrOYC/acp-dart)
+[![ACP methods](https://img.shields.io/badge/ACP%20methods-43%2F43-brightgreen)](#coverage)
+[![tests](https://img.shields.io/badge/tests-194%20passing-brightgreen)](#coverage)
 
 The official Dart implementation of the Agent Client Protocol (ACP) — a standardized communication protocol between code editors and AI-powered coding agents.
 
@@ -100,9 +102,18 @@ Present in the published schema but newer than the stable v1 surface. Several ar
 
 ### Coverage
 
-Every method in the published ACP schema is implemented — all 28 agent methods, 14 client methods, and the protocol cancellation notification. Verify with the diff command in [`parity_verification_checklist.md`](parity_verification_checklist.md).
+Every method in the published ACP schema is implemented.
 
-Note that `providers/*`, `nes/*`, `document/did*`, and `mcp/*` are newer than the stable v1 surface, and several are still at RFD stage — their shapes may change. They are implemented here for completeness; pin a version if you depend on them.
+| Method table | Schema | Implemented |
+|---|---:|---:|
+| `AGENT_METHODS` | 28 | 28 |
+| `CLIENT_METHODS` | 14 | 14 |
+| `PROTOCOL_METHODS` | 1 | 1 |
+| **Total** | **43** | **43** |
+
+The badge is not hand-maintained: the counts come from diffing `agentMethods` / `clientMethods` / `protocolMethods` against the generated schema constants, in both directions. [`parity_verification_checklist.md`](parity_verification_checklist.md) has the command — run it before each release and update the badge if the number moves.
+
+The one method this package has that the schema does not is the deprecated `session/set_model`, listed above.
 
 Filesystem methods beyond the ACP surface (delete/move/mkdir/list) do not exist in the schema and are not implemented.
 
