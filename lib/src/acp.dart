@@ -5,6 +5,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:acp_dart/src/elicitation_converters.dart';
 import 'package:acp_dart/src/schema.dart';
 import 'package:acp_dart/src/stream.dart';
 
@@ -395,6 +396,53 @@ abstract class Client {
     KillTerminalCommandRequest params,
   );
 
+  /// Requests structured input from the user.
+  ///
+  /// Only available if the client advertises an `elicitation` capability for
+  /// the requested mode. Form elicitations are answered directly; URL
+  /// elicitations direct the user elsewhere and are resolved out of band,
+  /// with the agent later sending [completeElicitation].
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the agent.
+  ///
+  /// See protocol docs: [Elicitation](https://agentclientprotocol.com/protocol/elicitation)
+  Future<CreateElicitationResponse>? createElicitation(
+    CreateElicitationRequest params,
+  ) => null;
+
+  /// Notifies the client that a URL elicitation has been resolved out of band.
+  ///
+  /// The client should dismiss any UI it is showing for the elicitation
+  /// identified by `elicitationId`.
+  Future<void>? completeElicitation(CompleteElicitationNotification params) =>
+      null;
+
+  /// Opens an MCP connection on the agent's behalf.
+  ///
+  /// Lets an agent reach an MCP server the client already has access to,
+  /// instead of opening its own transport. The returned `connectionId`
+  /// addresses that connection for [messageMcp] and [disconnectMcp].
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the agent.
+  Future<ConnectMcpResponse>? connectMcp(ConnectMcpRequest params) => null;
+
+  /// Forwards a tunnelled MCP request and returns the MCP server's reply.
+  ///
+  /// The reply is arbitrary JSON -- it is the MCP result, passed through
+  /// untouched -- so this is intentionally not a typed model.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the agent.
+  Future<Object?>? messageMcp(MessageMcpRequest params) => null;
+
+  /// Forwards a tunnelled MCP notification, which expects no reply.
+  Future<void>? notifyMcp(MessageMcpNotification params) => null;
+
+  /// Closes an MCP connection opened by [connectMcp].
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the agent.
+  Future<DisconnectMcpResponse>? disconnectMcp(DisconnectMcpRequest params) =>
+      null;
+
   /// Extension method
   ///
   /// Allows the Agent to send an arbitrary request that is not part of the ACP spec.
@@ -490,6 +538,78 @@ class AgentSideConnection implements Client {
             ResumeSessionRequest.fromJson,
             agent.unstableResumeSession,
           );
+        case 'session/close':
+          return handleOptionalRequest(
+            method,
+            params,
+            CloseSessionRequest.fromJson,
+            agent.closeSession,
+          );
+        case 'session/delete':
+          return handleOptionalRequest(
+            method,
+            params,
+            DeleteSessionRequest.fromJson,
+            agent.deleteSession,
+          );
+        case 'logout':
+          return handleOptionalRequest(
+            method,
+            params,
+            LogoutRequest.fromJson,
+            agent.logout,
+          );
+        case 'nes/start':
+          return handleOptionalRequest(
+            method,
+            params,
+            StartNesRequest.fromJson,
+            agent.startNes,
+          );
+        case 'nes/suggest':
+          return handleOptionalRequest(
+            method,
+            params,
+            SuggestNesRequest.fromJson,
+            agent.suggestNes,
+          );
+        case 'nes/close':
+          return handleOptionalRequest(
+            method,
+            params,
+            CloseNesRequest.fromJson,
+            agent.closeNes,
+          );
+        case 'mcp/message':
+          final mcpParams = MessageMcpRequest.fromJson(
+            params as Map<String, dynamic>,
+          );
+          final mcpResult = agent.messageMcp(mcpParams);
+          if (mcpResult == null) {
+            throw RequestError.methodNotFound(method);
+          }
+          return await mcpResult;
+        case 'providers/list':
+          return handleOptionalRequest(
+            method,
+            params,
+            ListProvidersRequest.fromJson,
+            agent.listProviders,
+          );
+        case 'providers/set':
+          return handleOptionalRequest(
+            method,
+            params,
+            SetProviderRequest.fromJson,
+            agent.setProvider,
+          );
+        case 'providers/disable':
+          return handleOptionalRequest(
+            method,
+            params,
+            DisableProviderRequest.fromJson,
+            agent.disableProvider,
+          );
         case 'session/set_mode':
           final validatedParams = SetSessionModeRequest.fromJson(
             params as Map<String, dynamic>,
@@ -542,6 +662,56 @@ class AgentSideConnection implements Client {
             params as Map<String, dynamic>,
           );
           return agent.cancel(validatedParams);
+        case 'nes/accept':
+          await agent.acceptNes(
+            AcceptNesNotification.fromJson(params as Map<String, dynamic>),
+          );
+          return;
+        case 'nes/reject':
+          await agent.rejectNes(
+            RejectNesNotification.fromJson(params as Map<String, dynamic>),
+          );
+          return;
+        case 'mcp/message':
+          await agent.notifyMcp(
+            MessageMcpNotification.fromJson(params as Map<String, dynamic>),
+          );
+          return;
+        case 'document/didOpen':
+          await agent.didOpenDocument(
+            DidOpenDocumentNotification.fromJson(
+              params as Map<String, dynamic>,
+            ),
+          );
+          return;
+        case 'document/didChange':
+          await agent.didChangeDocument(
+            DidChangeDocumentNotification.fromJson(
+              params as Map<String, dynamic>,
+            ),
+          );
+          return;
+        case 'document/didClose':
+          await agent.didCloseDocument(
+            DidCloseDocumentNotification.fromJson(
+              params as Map<String, dynamic>,
+            ),
+          );
+          return;
+        case 'document/didSave':
+          await agent.didSaveDocument(
+            DidSaveDocumentNotification.fromJson(
+              params as Map<String, dynamic>,
+            ),
+          );
+          return;
+        case 'document/didFocus':
+          await agent.didFocusDocument(
+            DidFocusDocumentNotification.fromJson(
+              params as Map<String, dynamic>,
+            ),
+          );
+          return;
         case r'$/cancel_request':
           final validatedParams = CancelRequestNotification.fromJson(
             params as Map<String, dynamic>,
@@ -594,6 +764,66 @@ class AgentSideConnection implements Client {
       params.toJson(),
     );
     return ReadTextFileResponse.fromJson(result as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ConnectMcpResponse> connectMcp(ConnectMcpRequest params) async {
+    final result = await _connection.sendRequest(
+      clientMethods['mcpConnect']!,
+      params.toJson(),
+    );
+    return ConnectMcpResponse.fromJson(result as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Object?> messageMcp(MessageMcpRequest params) async {
+    // The MCP reply is arbitrary JSON; hand it back untouched.
+    return _connection.sendRequest(
+      clientMethods['mcpMessage']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> notifyMcp(MessageMcpNotification params) async {
+    return _connection.sendNotification(
+      clientMethods['mcpMessage']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<DisconnectMcpResponse> disconnectMcp(
+    DisconnectMcpRequest params,
+  ) async {
+    final result = await _connection.sendRequest(
+      clientMethods['mcpDisconnect']!,
+      params.toJson(),
+    );
+    return DisconnectMcpResponse.fromJson(result as Map<String, dynamic>);
+  }
+
+  @override
+  Future<CreateElicitationResponse> createElicitation(
+    CreateElicitationRequest params,
+  ) async {
+    final result = await _connection.sendRequest(
+      clientMethods['elicitationCreate']!,
+      const CreateElicitationRequestConverter().toJson(params),
+    );
+    return const CreateElicitationResponseConverter().fromJson(
+      result as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Future<void> completeElicitation(
+    CompleteElicitationNotification params,
+  ) async {
+    return _connection.sendNotification(
+      clientMethods['elicitationComplete']!,
+      params.toJson(),
+    );
   }
 
   @override
@@ -716,6 +946,20 @@ class ClientSideConnection implements Agent {
   ) {
     final client = toAgent(this);
 
+    Future<dynamic> handleOptionalClientRequest<T>(
+      String method,
+      dynamic params,
+      T Function(Map<String, dynamic>) fromJson,
+      Future<dynamic>? Function(T) handler,
+    ) async {
+      final validatedParams = fromJson(params as Map<String, dynamic>);
+      final result = await handler(validatedParams);
+      if (result == null) {
+        throw RequestError.methodNotFound(method);
+      }
+      return result;
+    }
+
     Future<dynamic> requestHandler(String method, dynamic params) async {
       switch (method) {
         case 'fs/write_text_file':
@@ -733,6 +977,39 @@ class ClientSideConnection implements Agent {
             params as Map<String, dynamic>,
           );
           return client.requestPermission(validatedParams);
+        case 'mcp/connect':
+          return handleOptionalClientRequest(
+            method,
+            params,
+            ConnectMcpRequest.fromJson,
+            client.connectMcp,
+          );
+        case 'mcp/disconnect':
+          return handleOptionalClientRequest(
+            method,
+            params,
+            DisconnectMcpRequest.fromJson,
+            client.disconnectMcp,
+          );
+        case 'mcp/message':
+          final mcpParams = MessageMcpRequest.fromJson(
+            params as Map<String, dynamic>,
+          );
+          final mcpResult = client.messageMcp(mcpParams);
+          if (mcpResult == null) {
+            throw RequestError.methodNotFound(method);
+          }
+          // The MCP reply is arbitrary JSON, returned as-is.
+          return await mcpResult;
+        case 'elicitation/create':
+          final validatedParams = const CreateElicitationRequestConverter()
+              .fromJson(params as Map<String, dynamic>);
+          final result = await client.createElicitation(validatedParams);
+          if (result == null) {
+            throw RequestError.methodNotFound(method);
+          }
+          // The response is a union, so it carries no `toJson` of its own.
+          return const CreateElicitationResponseConverter().toJson(result);
         case 'terminal/create':
           final validatedParams = CreateTerminalRequest.fromJson(
             params as Map<String, dynamic>,
@@ -794,6 +1071,17 @@ class ClientSideConnection implements Agent {
             params as Map<String, dynamic>,
           );
           return client.sessionUpdate(validatedParams);
+        case 'mcp/message':
+          await client.notifyMcp(
+            MessageMcpNotification.fromJson(params as Map<String, dynamic>),
+          );
+          return;
+        case 'elicitation/complete':
+          final validatedParams = CompleteElicitationNotification.fromJson(
+            params as Map<String, dynamic>,
+          );
+          await client.completeElicitation(validatedParams);
+          return;
         case r'$/cancel_request':
           final validatedParams = CancelRequestNotification.fromJson(
             params as Map<String, dynamic>,
@@ -937,6 +1225,66 @@ class ClientSideConnection implements Agent {
   }
 
   @override
+  Future<LogoutResponse>? logout(LogoutRequest params) async {
+    return _sendTypedRequest(
+      agentMethods['logout']!,
+      params.toJson(),
+      LogoutResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<ListProvidersResponse>? listProviders(
+    ListProvidersRequest params,
+  ) async {
+    return _sendTypedRequest(
+      agentMethods['providersList']!,
+      params.toJson(),
+      ListProvidersResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<SetProviderResponse>? setProvider(SetProviderRequest params) async {
+    return _sendTypedRequest(
+      agentMethods['providersSet']!,
+      params.toJson(),
+      SetProviderResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<DisableProviderResponse>? disableProvider(
+    DisableProviderRequest params,
+  ) async {
+    return _sendTypedRequest(
+      agentMethods['providersDisable']!,
+      params.toJson(),
+      DisableProviderResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<CloseSessionResponse>? closeSession(CloseSessionRequest params) async {
+    return _sendTypedRequest(
+      agentMethods['sessionClose']!,
+      params.toJson(),
+      CloseSessionResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<DeleteSessionResponse>? deleteSession(
+    DeleteSessionRequest params,
+  ) async {
+    return _sendTypedRequest(
+      agentMethods['sessionDelete']!,
+      params.toJson(),
+      DeleteSessionResponse.fromJson,
+    );
+  }
+
+  @override
   Future<PromptResponse> prompt(PromptRequest params) async {
     return _sendTypedRequest(
       agentMethods['sessionPrompt']!,
@@ -949,6 +1297,105 @@ class ClientSideConnection implements Agent {
   Future<void> cancel(CancelNotification params) async {
     return _connection.sendNotification(
       agentMethods['sessionCancel']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<StartNesResponse>? startNes(StartNesRequest params) async {
+    return _sendTypedRequest(
+      agentMethods['nesStart']!,
+      params.toJson(),
+      StartNesResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<SuggestNesResponse>? suggestNes(SuggestNesRequest params) async {
+    return _sendTypedRequest(
+      agentMethods['nesSuggest']!,
+      params.toJson(),
+      SuggestNesResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<void>? acceptNes(AcceptNesNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['nesAccept']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void>? rejectNes(RejectNesNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['nesReject']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<CloseNesResponse>? closeNes(CloseNesRequest params) async {
+    return _sendTypedRequest(
+      agentMethods['nesClose']!,
+      params.toJson(),
+      CloseNesResponse.fromJson,
+    );
+  }
+
+  @override
+  Future<Object?> messageMcp(MessageMcpRequest params) async {
+    return _connection.sendRequest(
+      agentMethods['mcpMessage']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> notifyMcp(MessageMcpNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['mcpMessage']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> didOpenDocument(DidOpenDocumentNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['documentDidOpen']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> didChangeDocument(DidChangeDocumentNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['documentDidChange']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> didCloseDocument(DidCloseDocumentNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['documentDidClose']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> didSaveDocument(DidSaveDocumentNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['documentDidSave']!,
+      params.toJson(),
+    );
+  }
+
+  @override
+  Future<void> didFocusDocument(DidFocusDocumentNotification params) async {
+    return _connection.sendNotification(
+      agentMethods['documentDidFocus']!,
       params.toJson(),
     );
   }
@@ -1041,6 +1488,23 @@ abstract class Agent {
     ResumeSessionRequest params,
   ) => null;
 
+  /// Releases the resources backing an active session.
+  ///
+  /// The session remains in the Agent's history and can still be loaded or
+  /// resumed later; use [deleteSession] to discard it entirely.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<CloseSessionResponse>? closeSession(CloseSessionRequest params) => null;
+
+  /// Removes a session from the Agent's session history.
+  ///
+  /// Unlike [closeSession], this discards the stored session. Returning `null`
+  /// reports `-32601 Method not found` to the client.
+  ///
+  /// See protocol docs: [Session Delete](https://agentclientprotocol.com/protocol/session-delete)
+  Future<DeleteSessionResponse>? deleteSession(DeleteSessionRequest params) =>
+      null;
+
   /// Sets the operational mode for a session.
   ///
   /// Allows switching between different agent modes (e.g., "ask", "architect", "code")
@@ -1064,7 +1528,14 @@ abstract class Agent {
 
   /// Selects the model for a given session.
   ///
-  /// **UNSTABLE:** This capability is not part of the spec yet, and may be removed or changed at any point.
+  /// **DEPRECATED:** `session/set_model` is not part of the ACP schema. Model
+  /// selection is expressed through [setSessionConfigOption] with a model
+  /// config category. This method still dispatches so existing integrations
+  /// keep working, and will be removed in the next major release.
+  @Deprecated(
+    'Not part of the ACP schema. Use setSessionConfigOption with a model '
+    'config category. Will be removed in the next major release.',
+  )
   Future<SetSessionModelResponse?>? setSessionModel(
     SetSessionModelRequest params,
   );
@@ -1077,6 +1548,97 @@ abstract class Agent {
   /// After successful authentication, the client can proceed to create sessions with
   /// `newSession` without receiving an `auth_required` error.
   Future<AuthenticateResponse?>? authenticate(AuthenticateRequest params);
+
+  /// Clears any credentials the Agent holds for the current connection.
+  ///
+  /// Only meaningful when the Agent advertised authentication methods during
+  /// initialization. After logging out, the client must authenticate again
+  /// before creating new sessions.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  ///
+  /// See protocol docs: [Authentication](https://agentclientprotocol.com/protocol/authentication)
+  Future<LogoutResponse>? logout(LogoutRequest params) => null;
+
+  /// Lists the LLM providers this agent can reach, and how each is configured.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<ListProvidersResponse>? listProviders(ListProvidersRequest params) =>
+      null;
+
+  /// Points a provider at an endpoint.
+  ///
+  /// `params.headers` typically carries credentials — do not log it.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<SetProviderResponse>? setProvider(SetProviderRequest params) => null;
+
+  /// Disables a provider, clearing any configuration held for it.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<DisableProviderResponse>? disableProvider(
+    DisableProviderRequest params,
+  ) => null;
+
+  /// Reports that a document was opened in the client.
+  ///
+  /// These `document/*` notifications keep the agent's view of open buffers in
+  /// sync, which is what makes unsaved edits visible to features like
+  /// Next Edit Suggestions. They are one-way; a client may send them without
+  /// the agent handling them.
+  Future<void>? didOpenDocument(DidOpenDocumentNotification params) => null;
+
+  /// Reports edits to an open document.
+  Future<void>? didChangeDocument(DidChangeDocumentNotification params) => null;
+
+  /// Reports that a document was closed.
+  Future<void>? didCloseDocument(DidCloseDocumentNotification params) => null;
+
+  /// Reports that a document was saved.
+  Future<void>? didSaveDocument(DidSaveDocumentNotification params) => null;
+
+  /// Reports that focus moved to a document, with the cursor and viewport.
+  Future<void>? didFocusDocument(DidFocusDocumentNotification params) => null;
+
+  /// Forwards a tunnelled MCP request travelling client-to-agent.
+  ///
+  /// `mcp/message` appears on both method tables, so it flows in both
+  /// directions. The reply is arbitrary JSON, passed through untouched.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<Object?>? messageMcp(MessageMcpRequest params) => null;
+
+  /// Forwards a tunnelled MCP notification travelling client-to-agent.
+  Future<void>? notifyMcp(MessageMcpNotification params) => null;
+
+  /// Starts a Next Edit Suggestions session.
+  ///
+  /// NES sessions are separate from prompt sessions and carry their own id.
+  /// Suggestion quality depends on the agent seeing current buffer state, so
+  /// pair this with the `document/did*` notifications.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<StartNesResponse>? startNes(StartNesRequest params) => null;
+
+  /// Asks for suggestions at the cursor.
+  ///
+  /// Only send context the agent advertised via [NesContextCapabilities], and
+  /// expect only suggestion kinds the client advertised via
+  /// [ClientNesCapabilities].
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<SuggestNesResponse>? suggestNes(SuggestNesRequest params) => null;
+
+  /// Reports that the user took a suggestion.
+  Future<void>? acceptNes(AcceptNesNotification params) => null;
+
+  /// Reports that a suggestion was not taken, and why.
+  Future<void>? rejectNes(RejectNesNotification params) => null;
+
+  /// Tears down a NES session.
+  ///
+  /// Returning `null` reports `-32601 Method not found` to the client.
+  Future<CloseNesResponse>? closeNes(CloseNesRequest params) => null;
 
   /// Processes a user prompt within a session.
   ///

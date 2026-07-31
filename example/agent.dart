@@ -64,6 +64,107 @@ class ExampleAgent implements Agent {
   }
 
   @override
+  Future<ListSessionsResponse>? unstableListSessions(
+    ListSessionsRequest params,
+  ) => null;
+
+  @override
+  Future<ForkSessionResponse>? unstableForkSession(ForkSessionRequest params) =>
+      null;
+
+  @override
+  Future<ResumeSessionResponse>? unstableResumeSession(
+    ResumeSessionRequest params,
+  ) => null;
+
+  @override
+  Future<CloseSessionResponse>? closeSession(CloseSessionRequest params) async {
+    // Releasing session resources; the session stays in history.
+    _sessions.remove(params.sessionId);
+    return CloseSessionResponse();
+  }
+
+  @override
+  Future<DeleteSessionResponse>? deleteSession(
+    DeleteSessionRequest params,
+  ) async {
+    _sessions.remove(params.sessionId);
+    return DeleteSessionResponse();
+  }
+
+  @override
+  Future<ListProvidersResponse>? listProviders(
+    ListProvidersRequest params,
+  ) async {
+    return ListProvidersResponse(
+      providers: [
+        ProviderInfo(
+          providerId: 'example',
+          supported: const [LlmProtocols.anthropic, LlmProtocols.openai],
+          required: false,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<SetProviderResponse>? setProvider(SetProviderRequest params) async {
+    // Never log params.headers -- it carries credentials.
+    return SetProviderResponse();
+  }
+
+  @override
+  Future<DisableProviderResponse>? disableProvider(
+    DisableProviderRequest params,
+  ) async {
+    return DisableProviderResponse();
+  }
+
+  @override
+  Future<void>? didOpenDocument(DidOpenDocumentNotification params) => null;
+
+  @override
+  Future<Object?>? messageMcp(MessageMcpRequest params) => null;
+
+  @override
+  Future<StartNesResponse>? startNes(StartNesRequest params) => null;
+
+  @override
+  Future<SuggestNesResponse>? suggestNes(SuggestNesRequest params) => null;
+
+  @override
+  Future<void>? acceptNes(AcceptNesNotification params) => null;
+
+  @override
+  Future<void>? rejectNes(RejectNesNotification params) => null;
+
+  @override
+  Future<CloseNesResponse>? closeNes(CloseNesRequest params) => null;
+
+
+  @override
+  Future<void>? notifyMcp(MessageMcpNotification params) => null;
+
+
+  @override
+  Future<void>? didChangeDocument(DidChangeDocumentNotification params) => null;
+
+  @override
+  Future<void>? didCloseDocument(DidCloseDocumentNotification params) => null;
+
+  @override
+  Future<void>? didSaveDocument(DidSaveDocumentNotification params) => null;
+
+  @override
+  Future<void>? didFocusDocument(DidFocusDocumentNotification params) => null;
+
+  @override
+  Future<LogoutResponse>? logout(LogoutRequest params) async {
+    // This example holds no credentials, so logging out is a no-op.
+    return LogoutResponse();
+  }
+
+  @override
   Future<SetSessionModeResponse?>? setSessionMode(
     SetSessionModeRequest params,
   ) async {

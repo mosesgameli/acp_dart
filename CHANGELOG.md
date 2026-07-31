@@ -1,3 +1,156 @@
+## 0.6.0
+
+Completes the method inventory: every method in the published ACP schema is
+now implemented. Verified by diffing `agentMethods`/`clientMethods` against
+the generated schema constants — 28 agent methods, 14 client methods, and the
+protocol cancellation notification, with no gaps.
+
+These surfaces are newer than the stable v1 set and several are still at RFD
+stage, so their shapes may change. Pin a version if you depend on them.
+
+### Added
+
+- **Providers:** `providers/list`, `providers/set`, `providers/disable`, with
+  `ProviderInfo`, `ProviderCurrentConfig`, and `ProvidersCapabilities`.
+  `LlmProtocol` is an open string union in the schema, so it maps to a String
+  typedef with known values on `LlmProtocols` rather than an enum — an
+  unrecognised protocol has to round-trip, not throw. `SetProviderRequest`
+  overrides `toString` to redact `headers`, which carries credentials.
+- **Document sync:** `document/didOpen`, `didChange`, `didClose`, `didSave`,
+  and `didFocus`, plus `Position`, `Range`,
+  `TextDocumentContentChangeEvent`, and `TextDocumentSyncKind`. A null range
+  on a content change means a full-document replacement.
+- **MCP over ACP:** `mcp/connect`, `mcp/message`, `mcp/disconnect`, and the
+  `acp` variant of the McpServer union. `mcp/message` is unusual twice over:
+  it sits on both method tables so it is wired in both directions, and it
+  arrives as either a request or a notification depending on whether the
+  tunnelled MCP message carries an id. Its reply is `Object?` rather than a
+  typed model — it is the MCP server's own result, and reshaping it would
+  corrupt the tunnel.
+- **Next Edit Suggestions:** `nes/start`, `nes/suggest`, `nes/accept`,
+  `nes/reject`, `nes/close`. Suggestions are a union over edit, jump, rename,
+  and searchAndReplace with an `UnknownNesSuggestion` fallback. Includes the
+  context types (recent files, related snippets, edit history, user actions,
+  open files, diagnostics) and the capability trees on both sides:
+  `NesCapabilities` for what context an agent accepts,
+  `ClientNesCapabilities` for what suggestion kinds a client can act on.
+  Also adds `WorkspaceFolder`.
+
+### Fixed
+
+- **Capability negotiation:** `ProvidersCapabilities`, `NesCapabilities`, and
+  `ClientNesCapabilities` existed as types but were never attached to
+  `AgentCapabilities` or `ClientCapabilities`, so the provider and NES methods
+  were dispatched yet undiscoverable — no peer could learn they were
+  supported. Adds `auth`/`providers`/`nes`/`positionEncoding` to
+  `AgentCapabilities`, `session`/`plan`/`auth`/`nes`/`positionEncodings` to
+  `ClientCapabilities`, and `delete`/`close`/`additionalDirectories` to
+  `SessionCapabilities`, plus `PositionEncodingKind` and the supporting
+  capability types.
+- **Boolean session config options:** `SessionConfigOption` was select-only —
+  `options` was required and `currentValue` was a `String`, so a
+  `type: "boolean"` option could not be represented at all. It is now a union
+  over `SelectSessionConfigOption` and `BooleanSessionConfigOption` with an
+  `UnknownSessionConfigOption` fallback. An option arriving without a `type`
+  is read as select, since agents predating the boolean variant omit the
+  field. Adds `SessionConfigOptionCategories` for the known category values.
+- **ToolCallContent serialisation:** all three variants declared their `type`
+  discriminator as a plain final field with an initialiser instead of a
+  constructor parameter, so `json_serializable` treated it as non-settable
+  state and left it out of `toJson`. Every `ToolCallContent` therefore crossed
+  the wire without its discriminator, and the receiving
+  `ToolCallContentConverter` threw `Unknown ToolCallContent type: null`. In
+  practice no agent could report tool output, propose a diff, or reference a
+  terminal to any client. `ContentBlock` was unaffected because its variants
+  already take `type` as a constructor parameter with a default, which is now
+  the pattern here too. Adds `test/union_round_trip_test.dart`, covering every
+  discriminated union in both directions: the existing union tests only parsed
+  hand-written JSON, which always carries a `type`, so a variant that failed to
+  emit one was invisible to them.
+
+### Compatibility Notes
+
+- **Breaking — `SessionConfigOption` is now abstract.** Construct
+  `SelectSessionConfigOption` instead, and cast before reading `currentValue`
+  or `options`, which live on the concrete variants. The `type` argument is
+  gone; the converter supplies the discriminator.
+- **Breaking — `SetSessionConfigOptionRequest.value` is `Object`** rather than
+  `String`, so it can carry a bool. Existing call sites passing a String still
+  compile; reading `.value` as a String needs a cast. Prefer the new
+  `.select()` and `.boolean()` constructors.
+- **Breaking for `implements`:** As in 0.5.0, adding members to the `Agent`
+  and `Client` interfaces breaks implementors using `implements`, which
+  requires every member to be declared. Every new member carries a `=> null`
+  default, so `extends` users are unaffected, and returning `null` yields
+  `-32601 Method not found` — the behaviour an agent without these
+  capabilities should have anyway.
+
+## 0.5.0
+
+Brings the package in line with the stable ACP v1 method inventory. The
+missing methods were identified by diffing `agentMethods`/`clientMethods`
+against the published schema's method constants.
+
+### Added
+
+- **Elicitation:** Full support for `elicitation/create` and the
+  `elicitation/complete` notification, both agent-to-client. Covers form and
+  URL modes, session and request scopes, `ElicitationSchema` with all five
+  property schema variants (string, number, integer, boolean, array), titled
+  and plain multi-select item constraints, `EnumOption`, `StringFormat`, and
+  the accept/decline/cancel response actions. Unrecognised modes, property
+  types, and actions round-trip through `Unknown*` variants rather than being
+  dropped.
+- **Elicitation Capabilities:** `ClientCapabilities.elicitation` so clients can
+  advertise which elicitation modes they render.
+- **Session Lifecycle:** `session/close` and `session/delete`, with typed
+  models, dispatch, unions, and `Agent` interface members.
+- **Authentication:** `logout`, completing the authentication surface.
+- **Notification Routing:** `AgentNotificationUnion.fromMethod`, which
+  dispatches on the JSON-RPC method name. The existing `fromJson` takes only a
+  payload and always decodes it as a `SessionNotification`, so it cannot tell
+  `session/update` from `elicitation/complete`. `fromJson` is unchanged.
+
+### Changed
+
+- **Support Matrix:** `session/list` is documented as stable rather than
+  unstable. The README now enumerates the specific schema methods this package
+  does not implement (`providers/*`, `nes/*`, `document/did*`, `mcp/*`)
+  instead of describing them in the abstract.
+
+### Deprecated
+
+- **`session/set_model`:** Not present in the ACP schema. Model selection is
+  expressed through `session/set_config_option` with a model config category.
+  The method, `SetSessionModelRequest`/`Response`, `SessionModelState`,
+  `ModelInfo`, and the `ModelId` typedef are all marked `@Deprecated`. Dispatch
+  is retained so existing integrations keep working.
+
+### Fixed
+
+- **Example Agent:** `example/agent.dart` declared `implements Agent` but
+  omitted `unstableListSessions`, `unstableForkSession`, and
+  `unstableResumeSession`, so it had not compiled since those methods were
+  introduced — despite the README instructing users to run it. Dart only
+  inherits default method bodies through `extends`, never `implements`.
+- **README Snippets:** Both usage examples were non-compiling. The agent
+  snippet used `protocolVersion: '0.1.0'` (the field is an `int`) along with
+  `capabilities:` and `auth:`, neither of which exists. The client snippet
+  constructed `RequestPermissionResponse` with a non-existent `optionId:`
+  parameter and read `option.id` instead of `option.optionId`.
+
+### Compatibility Notes
+
+- **Breaking for `implements`:** Adding members to the `Agent` and `Client`
+  interfaces breaks implementors that use `implements`, which requires every
+  member to be declared. The new members carry `=> null` defaults, so classes
+  using `extends` are unaffected. Implementors using `implements` must add
+  `closeSession`, `deleteSession`, and `logout` (agents) or `createElicitation`
+  and `completeElicitation` (clients). Returning `null` from any of them keeps
+  the previous behaviour: `-32601 Method not found`.
+- **Deprecation:** The `session/set_model` surface will be removed in the next
+  major release.
+
 ## 0.4.0
 
 ### Added

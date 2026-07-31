@@ -1153,7 +1153,10 @@ void main() {
 
         final response = await future;
         expect(response.configOptions.first.id, equals('mode'));
-        expect(response.configOptions.first.currentValue, equals('code'));
+        // currentValue lives on the concrete variant, not the base.
+        final option =
+            response.configOptions.first as SelectSessionConfigOption;
+        expect(option.currentValue, equals('code'));
       },
     );
 
@@ -1594,6 +1597,76 @@ class MockAgent implements Agent {
   }
 
   @override
+  Future<CloseSessionResponse>? closeSession(CloseSessionRequest params) {
+    return null;
+  }
+
+  @override
+  Future<DeleteSessionResponse>? deleteSession(DeleteSessionRequest params) {
+    return null;
+  }
+
+  @override
+  Future<LogoutResponse>? logout(LogoutRequest params) {
+    return null;
+  }
+
+  @override
+  Future<void>? didOpenDocument(DidOpenDocumentNotification params) => null;
+
+  @override
+  Future<Object?>? messageMcp(MessageMcpRequest params) => null;
+
+  @override
+  Future<StartNesResponse>? startNes(StartNesRequest params) => null;
+
+  @override
+  Future<SuggestNesResponse>? suggestNes(SuggestNesRequest params) => null;
+
+  @override
+  Future<void>? acceptNes(AcceptNesNotification params) => null;
+
+  @override
+  Future<void>? rejectNes(RejectNesNotification params) => null;
+
+  @override
+  Future<CloseNesResponse>? closeNes(CloseNesRequest params) => null;
+
+
+  @override
+  Future<void>? notifyMcp(MessageMcpNotification params) => null;
+
+
+  @override
+  Future<void>? didChangeDocument(DidChangeDocumentNotification params) => null;
+
+  @override
+  Future<void>? didCloseDocument(DidCloseDocumentNotification params) => null;
+
+  @override
+  Future<void>? didSaveDocument(DidSaveDocumentNotification params) => null;
+
+  @override
+  Future<void>? didFocusDocument(DidFocusDocumentNotification params) => null;
+
+  @override
+  Future<ListProvidersResponse>? listProviders(ListProvidersRequest params) {
+    return null;
+  }
+
+  @override
+  Future<SetProviderResponse>? setProvider(SetProviderRequest params) {
+    return null;
+  }
+
+  @override
+  Future<DisableProviderResponse>? disableProvider(
+    DisableProviderRequest params,
+  ) {
+    return null;
+  }
+
+  @override
   Future<SetSessionModeResponse?>? setSessionMode(
     SetSessionModeRequest params,
   ) async {
@@ -1702,11 +1775,11 @@ class ConfigurableMockAgent extends MockAgent
     lastSetConfigRequest = params;
     return SetSessionConfigOptionResponse(
       configOptions: [
-        SessionConfigOption(
+        SelectSessionConfigOption(
           id: params.configId,
           name: 'Session Mode',
           category: 'mode',
-          currentValue: params.value,
+          currentValue: params.value as String,
           options: UngroupedSessionConfigSelectOptions(
             options: [
               SessionConfigSelectOption(value: 'ask', name: 'Ask'),
@@ -1737,6 +1810,32 @@ class MockClient implements Client {
   Future<void> sessionUpdate(SessionNotification params) async {
     // Mock implementation
   }
+
+  @override
+  Future<CreateElicitationResponse>? createElicitation(
+    CreateElicitationRequest params,
+  ) {
+    return null;
+  }
+
+  @override
+  Future<void>? completeElicitation(CompleteElicitationNotification params) {
+    return null;
+  }
+
+  @override
+  Future<ConnectMcpResponse>? connectMcp(ConnectMcpRequest params) => null;
+
+  @override
+  Future<Object?>? messageMcp(MessageMcpRequest params) => null;
+
+  @override
+  Future<void>? notifyMcp(MessageMcpNotification params) => null;
+
+  @override
+  Future<DisconnectMcpResponse>? disconnectMcp(DisconnectMcpRequest params) =>
+      null;
+
 
   @override
   Future<WriteTextFileResponse> writeTextFile(

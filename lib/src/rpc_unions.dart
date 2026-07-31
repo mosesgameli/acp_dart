@@ -41,7 +41,11 @@
 /// }
 /// ```
 
+library;
+
 import 'package:collection/collection.dart';
+
+import 'elicitation_converters.dart';
 
 import 'schema.dart';
 
@@ -70,12 +74,42 @@ abstract class AgentNotificationUnion {
     }
     return AgentExtensionNotification(payload);
   }
+
+  /// Deserializes a notification using its JSON-RPC method name.
+  ///
+  /// Prefer this over [fromJson], which cannot tell one agent notification
+  /// from another and always assumes `session/update`.
+  static AgentNotificationUnion fromMethod(String method, dynamic payload) {
+    switch (method) {
+      case 'session/update':
+        return SessionAgentNotification(
+          SessionNotification.fromJson(payload as Map<String, dynamic>),
+        );
+      case 'elicitation/complete':
+        return AgentCompleteElicitationNotification(
+          CompleteElicitationNotification.fromJson(
+            payload as Map<String, dynamic>,
+          ),
+        );
+      default:
+        return AgentExtensionNotification(payload);
+    }
+  }
 }
 
 class SessionAgentNotification extends AgentNotificationUnion {
   final SessionNotification notification;
 
   const SessionAgentNotification(this.notification);
+
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+class AgentCompleteElicitationNotification extends AgentNotificationUnion {
+  final CompleteElicitationNotification notification;
+
+  const AgentCompleteElicitationNotification(this.notification);
 
   @override
   Map<String, dynamic> toJson() => notification.toJson();
@@ -166,6 +200,12 @@ abstract class AgentRequestUnion {
         return AgentKillTerminalRequest(
           KillTerminalCommandRequest.fromJson(params as Map<String, dynamic>),
         );
+      case 'elicitation/create':
+        return AgentCreateElicitationRequest(
+          const CreateElicitationRequestConverter().fromJson(
+            params as Map<String, dynamic>,
+          ),
+        );
       default:
         return AgentExtensionMethodRequest(method, params);
     }
@@ -233,6 +273,16 @@ class AgentWaitForTerminalExitRequest extends AgentRequestUnion {
   String get method => clientMethods['terminalWaitForExit']!;
   @override
   Map<String, dynamic> toJson() => params.toJson();
+}
+
+class AgentCreateElicitationRequest extends AgentRequestUnion {
+  final CreateElicitationRequest params;
+  const AgentCreateElicitationRequest(this.params);
+  @override
+  String get method => clientMethods['elicitationCreate']!;
+  @override
+  Map<String, dynamic> toJson() =>
+      const CreateElicitationRequestConverter().toJson(params);
 }
 
 class AgentKillTerminalRequest extends AgentRequestUnion {
@@ -334,10 +384,102 @@ abstract class AgentResponseUnion {
                   result as Map<String, dynamic>,
                 ),
         );
+      case 'session/close':
+        return AgentCloseSessionResponse(
+          result == null
+              ? CloseSessionResponse()
+              : CloseSessionResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'session/delete':
+        return AgentDeleteSessionResponse(
+          result == null
+              ? DeleteSessionResponse()
+              : DeleteSessionResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'logout':
+        return AgentLogoutResponse(
+          result == null
+              ? LogoutResponse()
+              : LogoutResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'nes/start':
+        return AgentStartNesResponse(
+          StartNesResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'nes/suggest':
+        return AgentSuggestNesResponse(
+          SuggestNesResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'nes/close':
+        return AgentCloseNesResponse(
+          result == null
+              ? CloseNesResponse()
+              : CloseNesResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'providers/list':
+        return AgentListProvidersResponse(
+          ListProvidersResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'providers/set':
+        return AgentSetProviderResponse(
+          result == null
+              ? SetProviderResponse()
+              : SetProviderResponse.fromJson(result as Map<String, dynamic>),
+        );
+      case 'providers/disable':
+        return AgentDisableProviderResponse(
+          result == null
+              ? DisableProviderResponse()
+              : DisableProviderResponse.fromJson(
+                  result as Map<String, dynamic>,
+                ),
+        );
       default:
         return AgentExtensionMethodResponse(method, result);
     }
   }
+}
+
+class AgentListProvidersResponse extends AgentResponseUnion {
+  final ListProvidersResponse response;
+  const AgentListProvidersResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentSetProviderResponse extends AgentResponseUnion {
+  final SetProviderResponse response;
+  const AgentSetProviderResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentDisableProviderResponse extends AgentResponseUnion {
+  final DisableProviderResponse response;
+  const AgentDisableProviderResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentCloseSessionResponse extends AgentResponseUnion {
+  final CloseSessionResponse response;
+  const AgentCloseSessionResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentDeleteSessionResponse extends AgentResponseUnion {
+  final DeleteSessionResponse response;
+  const AgentDeleteSessionResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentLogoutResponse extends AgentResponseUnion {
+  final LogoutResponse response;
+  const AgentLogoutResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
 }
 
 class AgentInitializeResponse extends AgentResponseUnion {
@@ -516,6 +658,42 @@ abstract class ClientRequestUnion {
         return ClientSetSessionModelRequest(
           SetSessionModelRequest.fromJson(params as Map<String, dynamic>),
         );
+      case 'session/close':
+        return ClientCloseSessionRequest(
+          CloseSessionRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'session/delete':
+        return ClientDeleteSessionRequest(
+          DeleteSessionRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'logout':
+        return ClientLogoutRequest(
+          LogoutRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'nes/start':
+        return ClientStartNesRequest(
+          StartNesRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'nes/suggest':
+        return ClientSuggestNesRequest(
+          SuggestNesRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'nes/close':
+        return ClientCloseNesRequest(
+          CloseNesRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'providers/list':
+        return ClientListProvidersRequest(
+          ListProvidersRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'providers/set':
+        return ClientSetProviderRequest(
+          SetProviderRequest.fromJson(params as Map<String, dynamic>),
+        );
+      case 'providers/disable':
+        return ClientDisableProviderRequest(
+          DisableProviderRequest.fromJson(params as Map<String, dynamic>),
+        );
       default:
         return ClientExtensionMethodRequest(method, params);
     }
@@ -621,6 +799,60 @@ class ClientSetSessionModelRequest extends ClientRequestUnion {
   Map<String, dynamic> toJson() => params.toJson();
 }
 
+class ClientListProvidersRequest extends ClientRequestUnion {
+  final ListProvidersRequest params;
+  const ClientListProvidersRequest(this.params);
+  @override
+  String get method => agentMethods['providersList']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientSetProviderRequest extends ClientRequestUnion {
+  final SetProviderRequest params;
+  const ClientSetProviderRequest(this.params);
+  @override
+  String get method => agentMethods['providersSet']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientDisableProviderRequest extends ClientRequestUnion {
+  final DisableProviderRequest params;
+  const ClientDisableProviderRequest(this.params);
+  @override
+  String get method => agentMethods['providersDisable']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientCloseSessionRequest extends ClientRequestUnion {
+  final CloseSessionRequest params;
+  const ClientCloseSessionRequest(this.params);
+  @override
+  String get method => agentMethods['sessionClose']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientDeleteSessionRequest extends ClientRequestUnion {
+  final DeleteSessionRequest params;
+  const ClientDeleteSessionRequest(this.params);
+  @override
+  String get method => agentMethods['sessionDelete']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientLogoutRequest extends ClientRequestUnion {
+  final LogoutRequest params;
+  const ClientLogoutRequest(this.params);
+  @override
+  String get method => agentMethods['logout']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
 class ClientExtensionMethodRequest extends ClientRequestUnion {
   final String methodName;
   final dynamic rawParams;
@@ -700,10 +932,24 @@ abstract class ClientResponseUnion {
                   result as Map<String, dynamic>,
                 ),
         );
+      case 'elicitation/create':
+        return ClientCreateElicitationResponse(
+          const CreateElicitationResponseConverter().fromJson(
+            result as Map<String, dynamic>,
+          ),
+        );
       default:
         return ClientExtensionMethodResponse(method, result);
     }
   }
+}
+
+class ClientCreateElicitationResponse extends ClientResponseUnion {
+  final CreateElicitationResponse response;
+  const ClientCreateElicitationResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() =>
+      const CreateElicitationResponseConverter().toJson(response);
 }
 
 class ClientWriteTextFileResponse extends ClientResponseUnion {
@@ -803,6 +1049,36 @@ abstract class ClientNotificationUnion {
         return ClientCancelRequestNotification(
           CancelRequestNotification.fromJson(params as Map<String, dynamic>),
         );
+      case 'nes/accept':
+        return ClientAcceptNesNotification(
+          AcceptNesNotification.fromJson(params as Map<String, dynamic>),
+        );
+      case 'nes/reject':
+        return ClientRejectNesNotification(
+          RejectNesNotification.fromJson(params as Map<String, dynamic>),
+        );
+      case 'document/didOpen':
+        return ClientDidOpenDocumentNotification(
+          DidOpenDocumentNotification.fromJson(params as Map<String, dynamic>),
+        );
+      case 'document/didChange':
+        return ClientDidChangeDocumentNotification(
+          DidChangeDocumentNotification.fromJson(
+            params as Map<String, dynamic>,
+          ),
+        );
+      case 'document/didClose':
+        return ClientDidCloseDocumentNotification(
+          DidCloseDocumentNotification.fromJson(params as Map<String, dynamic>),
+        );
+      case 'document/didSave':
+        return ClientDidSaveDocumentNotification(
+          DidSaveDocumentNotification.fromJson(params as Map<String, dynamic>),
+        );
+      case 'document/didFocus':
+        return ClientDidFocusDocumentNotification(
+          DidFocusDocumentNotification.fromJson(params as Map<String, dynamic>),
+        );
       default:
         return ClientExtensionNotification(method, params);
     }
@@ -841,4 +1117,122 @@ class ClientExtensionNotification extends ClientNotificationUnion {
 extension AgentRequestLookup on Iterable<AgentRequestUnion> {
   AgentRequestUnion? findByMethod(String method) =>
       firstWhereOrNull((element) => element.method == method);
+}
+
+/// `document/didOpen` sent by the client to the agent.
+class ClientDidOpenDocumentNotification extends ClientNotificationUnion {
+  final DidOpenDocumentNotification notification;
+  const ClientDidOpenDocumentNotification(this.notification);
+  @override
+  String get method => agentMethods['documentDidOpen']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+/// `document/didChange` sent by the client to the agent.
+class ClientDidChangeDocumentNotification extends ClientNotificationUnion {
+  final DidChangeDocumentNotification notification;
+  const ClientDidChangeDocumentNotification(this.notification);
+  @override
+  String get method => agentMethods['documentDidChange']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+/// `document/didClose` sent by the client to the agent.
+class ClientDidCloseDocumentNotification extends ClientNotificationUnion {
+  final DidCloseDocumentNotification notification;
+  const ClientDidCloseDocumentNotification(this.notification);
+  @override
+  String get method => agentMethods['documentDidClose']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+/// `document/didSave` sent by the client to the agent.
+class ClientDidSaveDocumentNotification extends ClientNotificationUnion {
+  final DidSaveDocumentNotification notification;
+  const ClientDidSaveDocumentNotification(this.notification);
+  @override
+  String get method => agentMethods['documentDidSave']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+/// `document/didFocus` sent by the client to the agent.
+class ClientDidFocusDocumentNotification extends ClientNotificationUnion {
+  final DidFocusDocumentNotification notification;
+  const ClientDidFocusDocumentNotification(this.notification);
+  @override
+  String get method => agentMethods['documentDidFocus']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+class ClientStartNesRequest extends ClientRequestUnion {
+  final StartNesRequest params;
+  const ClientStartNesRequest(this.params);
+  @override
+  String get method => agentMethods['nesStart']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientSuggestNesRequest extends ClientRequestUnion {
+  final SuggestNesRequest params;
+  const ClientSuggestNesRequest(this.params);
+  @override
+  String get method => agentMethods['nesSuggest']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class ClientCloseNesRequest extends ClientRequestUnion {
+  final CloseNesRequest params;
+  const ClientCloseNesRequest(this.params);
+  @override
+  String get method => agentMethods['nesClose']!;
+  @override
+  Map<String, dynamic> toJson() => params.toJson();
+}
+
+class AgentStartNesResponse extends AgentResponseUnion {
+  final StartNesResponse response;
+  const AgentStartNesResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentSuggestNesResponse extends AgentResponseUnion {
+  final SuggestNesResponse response;
+  const AgentSuggestNesResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+class AgentCloseNesResponse extends AgentResponseUnion {
+  final CloseNesResponse response;
+  const AgentCloseNesResponse(this.response);
+  @override
+  Map<String, dynamic> toJson() => response.toJson();
+}
+
+/// `nes/accept` sent by the client to the agent.
+class ClientAcceptNesNotification extends ClientNotificationUnion {
+  final AcceptNesNotification notification;
+  const ClientAcceptNesNotification(this.notification);
+  @override
+  String get method => agentMethods['nesAccept']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
+}
+
+/// `nes/reject` sent by the client to the agent.
+class ClientRejectNesNotification extends ClientNotificationUnion {
+  final RejectNesNotification notification;
+  const ClientRejectNesNotification(this.notification);
+  @override
+  String get method => agentMethods['nesReject']!;
+  @override
+  Map<String, dynamic> toJson() => notification.toJson();
 }

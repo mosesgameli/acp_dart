@@ -4,9 +4,12 @@ import 'content_block_converter.dart';
 import 'embedded_resource_converter.dart';
 import 'session_update_converter.dart';
 import 'session_config_select_options_converter.dart';
+import 'session_config_option_converter.dart';
 import 'tool_call_content_converter.dart';
 import 'mcp_server_converter.dart';
 import 'request_permission_converter.dart';
+import 'elicitation_converters.dart';
+import 'nes_converters.dart';
 part 'schema.g.dart';
 
 typedef ProtocolVersion = int;
@@ -15,6 +18,11 @@ typedef SessionModeId = String;
 typedef SessionConfigId = String;
 typedef SessionConfigValueId = String;
 typedef SessionConfigGroupId = String;
+@Deprecated(
+  'Not part of the ACP schema. Model selection is expressed through '
+  'session/set_config_option with a model config category. '
+  'Will be removed in the next major release.',
+)
 typedef ModelId = String;
 typedef AuthMethodId = String;
 typedef ToolCallId = String;
@@ -180,7 +188,38 @@ class ClientCapabilities {
   @JsonKey(defaultValue: false)
   final bool terminal;
 
-  ClientCapabilities({this.meta, this.fs, this.terminal = false});
+  /// Session-related capabilities, such as which config option kinds render.
+  final ClientSessionCapabilities? session;
+
+  /// Present when the client can display plan updates.
+  final PlanCapabilities? plan;
+
+  /// Authentication capabilities, such as terminal-based flows.
+  final AuthCapabilities? auth;
+
+  /// NES suggestion kinds the client can act on.
+  final ClientNesCapabilities? nes;
+
+  /// Position encodings the client accepts, in order of preference.
+  final List<PositionEncodingKind>? positionEncodings;
+
+  /// Elicitation modes this client can render.
+  ///
+  /// Omitted or `null` means the client does not support elicitation; agents
+  /// must not send `elicitation/create` in that case.
+  final ElicitationCapabilities? elicitation;
+
+  ClientCapabilities({
+    this.meta,
+    this.fs,
+    this.terminal = false,
+    this.elicitation,
+    this.session,
+    this.plan,
+    this.auth,
+    this.nes,
+    this.positionEncodings,
+  });
 
   factory ClientCapabilities.fromJson(Map<String, dynamic> json) =>
       _$ClientCapabilitiesFromJson(json);
@@ -449,14 +488,46 @@ class SetSessionConfigOptionRequest {
   final Map<String, dynamic>? meta;
   final SessionId sessionId;
   final SessionConfigId configId;
-  final SessionConfigValueId value;
+
+  /// A [SessionConfigValueId] for a select option, or a `bool` for a boolean
+  /// option. Prefer the [SetSessionConfigOptionRequest.select] and
+  /// [SetSessionConfigOptionRequest.boolean] constructors.
+  final Object value;
+
+  /// `'boolean'` for a boolean option; omitted for a select option, which is
+  /// the wire default.
+  @JsonKey(includeIfNull: false)
+  final String? type;
 
   SetSessionConfigOptionRequest({
     this.meta,
     required this.sessionId,
     required this.configId,
     required this.value,
+    this.type,
   });
+
+  /// Sets a select option to [value].
+  SetSessionConfigOptionRequest.select({
+    this.meta,
+    required this.sessionId,
+    required this.configId,
+    required SessionConfigValueId value,
+    // Narrows the field's `Object` type, so an initializing formal won't do.
+    // ignore: prefer_initializing_formals
+  }) : value = value,
+       type = null;
+
+  /// Sets a boolean option to [value].
+  SetSessionConfigOptionRequest.boolean({
+    this.meta,
+    required this.sessionId,
+    required this.configId,
+    required bool value,
+    // Narrows the field's `Object` type, so an initializing formal won't do.
+    // ignore: prefer_initializing_formals
+  }) : value = value,
+       type = 'boolean';
 
   factory SetSessionConfigOptionRequest.fromJson(Map<String, dynamic> json) =>
       _$SetSessionConfigOptionRequestFromJson(json);
@@ -713,6 +784,11 @@ class ToolCall {
   Map<String, dynamic> toJson() => _$ToolCallToJson(this);
 }
 
+@Deprecated(
+  'Not part of the ACP schema. Model selection is expressed through '
+  'session/set_config_option with a model config category. '
+  'Will be removed in the next major release.',
+)
 @JsonSerializable()
 class SetSessionModelRequest {
   @JsonKey(name: '_meta', includeIfNull: false)
@@ -1023,12 +1099,28 @@ class AgentCapabilities {
   @JsonKey(defaultValue: false)
   final bool loadSession;
 
+  /// Authentication capabilities, including whether `logout` is supported.
+  final AgentAuthCapabilities? auth;
+
+  /// Present when the agent supports the `providers/*` methods.
+  final ProvidersCapabilities? providers;
+
+  /// Present when the agent supports the `nes/*` methods.
+  final NesCapabilities? nes;
+
+  /// How the agent counts character offsets in [Position].
+  final PositionEncodingKind? positionEncoding;
+
   AgentCapabilities({
     this.meta,
     this.mcpCapabilities,
     this.promptCapabilities,
     this.sessionCapabilities,
     this.loadSession = false,
+    this.auth,
+    this.providers,
+    this.nes,
+    this.positionEncoding,
   });
 
   factory AgentCapabilities.fromJson(Map<String, dynamic> json) =>
@@ -1045,7 +1137,24 @@ class SessionCapabilities {
   final SessionListCapabilities? list;
   final SessionResumeCapabilities? resume;
 
-  SessionCapabilities({this.meta, this.fork, this.list, this.resume});
+  /// Present when the agent supports `session/delete`.
+  final SessionDeleteCapabilities? delete;
+
+  /// Present when the agent supports `session/close`.
+  final SessionCloseCapabilities? close;
+
+  /// Present when the agent accepts additional workspace roots.
+  final SessionAdditionalDirectoriesCapabilities? additionalDirectories;
+
+  SessionCapabilities({
+    this.meta,
+    this.fork,
+    this.list,
+    this.resume,
+    this.delete,
+    this.close,
+    this.additionalDirectories,
+  });
 
   factory SessionCapabilities.fromJson(Map<String, dynamic> json) =>
       _$SessionCapabilitiesFromJson(json);
@@ -1168,12 +1277,117 @@ class AuthenticateResponse {
   Map<String, dynamic> toJson() => _$AuthenticateResponseToJson(this);
 }
 
+/// Request parameters for the `logout` method.
+///
+/// Clears any credentials the Agent is holding for the current connection.
+/// Only available if the Agent advertised at least one authentication method
+/// during initialization.
+///
+/// See protocol docs: [Authentication](https://agentclientprotocol.com/protocol/authentication)
+@JsonSerializable()
+class LogoutRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  LogoutRequest({this.meta});
+
+  factory LogoutRequest.fromJson(Map<String, dynamic> json) =>
+      _$LogoutRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$LogoutRequestToJson(this);
+}
+
+/// Response to the `logout` method.
+@JsonSerializable()
+class LogoutResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  LogoutResponse({this.meta});
+
+  factory LogoutResponse.fromJson(Map<String, dynamic> json) =>
+      _$LogoutResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$LogoutResponseToJson(this);
+}
+
+/// Request parameters for the `session/delete` method.
+///
+/// Removes a session from the Agent's session history. Unlike
+/// `session/close`, this discards the stored session entirely.
+///
+/// See protocol docs: [Session Delete](https://agentclientprotocol.com/protocol/session-delete)
+@JsonSerializable()
+class DeleteSessionRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// The ID of the session to delete.
+  final String sessionId;
+
+  DeleteSessionRequest({this.meta, required this.sessionId});
+
+  factory DeleteSessionRequest.fromJson(Map<String, dynamic> json) =>
+      _$DeleteSessionRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DeleteSessionRequestToJson(this);
+}
+
+/// Response to the `session/delete` method.
+@JsonSerializable()
+class DeleteSessionResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  DeleteSessionResponse({this.meta});
+
+  factory DeleteSessionResponse.fromJson(Map<String, dynamic> json) =>
+      _$DeleteSessionResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DeleteSessionResponseToJson(this);
+}
+
+/// Request parameters for the `session/close` method.
+///
+/// Releases the resources backing an active session while leaving it in the
+/// Agent's session history, so it can still be loaded or resumed later.
+@JsonSerializable()
+class CloseSessionRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// The ID of the session to close.
+  final String sessionId;
+
+  CloseSessionRequest({this.meta, required this.sessionId});
+
+  factory CloseSessionRequest.fromJson(Map<String, dynamic> json) =>
+      _$CloseSessionRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CloseSessionRequestToJson(this);
+}
+
+/// Response to the `session/close` method.
+@JsonSerializable()
+class CloseSessionResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  CloseSessionResponse({this.meta});
+
+  factory CloseSessionResponse.fromJson(Map<String, dynamic> json) =>
+      _$CloseSessionResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CloseSessionResponseToJson(this);
+}
+
 @JsonSerializable()
 class NewSessionResponse {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
   final String sessionId;
   @JsonKey(includeIfNull: false)
+  @NullableSessionConfigOptionListConverter()
   final List<SessionConfigOption>? configOptions;
   final SessionModeState? modes;
   final SessionModelState? models;
@@ -1234,6 +1448,11 @@ class SessionMode {
   Map<String, dynamic> toJson() => _$SessionModeToJson(this);
 }
 
+@Deprecated(
+  'Not part of the ACP schema. Model selection is expressed through '
+  'session/set_config_option with a model config category. '
+  'Will be removed in the next major release.',
+)
 @JsonSerializable()
 class SessionModelState {
   @JsonKey(name: '_meta', includeIfNull: false)
@@ -1255,35 +1474,114 @@ class SessionModelState {
   Map<String, dynamic> toJson() => _$SessionModelStateToJson(this);
 }
 
+/// Known [SessionConfigOption] categories.
+///
+/// The category is an open string union, so an agent may report others.
+abstract final class SessionConfigOptionCategories {
+  static const mode = 'mode';
+  static const model = 'model';
+  static const modelConfig = 'model_config';
+  static const thoughtLevel = 'thought_level';
+}
+
+/// A configuration option exposed by a session, discriminated on `type`.
+///
+/// Select options carry a list of choices; boolean options are a simple
+/// on/off toggle. Both share the identifying fields below.
+abstract class SessionConfigOption {
+  /// Identifies this option for `session/set_config_option`.
+  String get id;
+
+  /// Human-readable label.
+  String get name;
+  String? get description;
+
+  /// Groups related options. See [SessionConfigOptionCategories].
+  String? get category;
+}
+
+/// An option whose value is picked from a list of choices.
 @JsonSerializable()
-class SessionConfigOption {
+class SelectSessionConfigOption extends SessionConfigOption {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
+  @override
   final SessionConfigId id;
+  @override
   final String name;
+  @override
   final String? description;
+  @override
   final String? category;
-  @JsonKey(defaultValue: 'select')
-  final String type;
   final SessionConfigValueId currentValue;
   @SessionConfigSelectOptionsConverter()
   final SessionConfigSelectOptions options;
 
-  SessionConfigOption({
+  SelectSessionConfigOption({
     this.meta,
     required this.id,
     required this.name,
     this.description,
     this.category,
-    this.type = 'select',
     required this.currentValue,
     required this.options,
   });
 
-  factory SessionConfigOption.fromJson(Map<String, dynamic> json) =>
-      _$SessionConfigOptionFromJson(json);
+  factory SelectSessionConfigOption.fromJson(Map<String, dynamic> json) =>
+      _$SelectSessionConfigOptionFromJson(json);
 
-  Map<String, dynamic> toJson() => _$SessionConfigOptionToJson(this);
+  Map<String, dynamic> toJson() => _$SelectSessionConfigOptionToJson(this);
+}
+
+/// An option the user toggles on or off.
+@JsonSerializable()
+class BooleanSessionConfigOption extends SessionConfigOption {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final SessionConfigId id;
+  @override
+  final String name;
+  @override
+  final String? description;
+  @override
+  final String? category;
+  final bool currentValue;
+
+  BooleanSessionConfigOption({
+    this.meta,
+    required this.id,
+    required this.name,
+    this.description,
+    this.category,
+    required this.currentValue,
+  });
+
+  factory BooleanSessionConfigOption.fromJson(Map<String, dynamic> json) =>
+      _$BooleanSessionConfigOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BooleanSessionConfigOptionToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised config option types.
+@JsonSerializable()
+class UnknownSessionConfigOption extends SessionConfigOption {
+  final Map<String, dynamic> rawJson;
+  UnknownSessionConfigOption({required this.rawJson});
+
+  @override
+  String get id => (rawJson['id'] as String?) ?? '';
+  @override
+  String get name => (rawJson['name'] as String?) ?? '';
+  @override
+  String? get description => rawJson['description'] as String?;
+  @override
+  String? get category => rawJson['category'] as String?;
+
+  factory UnknownSessionConfigOption.fromJson(Map<String, dynamic> json) =>
+      _$UnknownSessionConfigOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$UnknownSessionConfigOptionToJson(this);
 }
 
 abstract class SessionConfigSelectOptions {}
@@ -1358,6 +1656,11 @@ class SessionConfigSelectGroup {
   Map<String, dynamic> toJson() => _$SessionConfigSelectGroupToJson(this);
 }
 
+@Deprecated(
+  'Not part of the ACP schema. Model selection is expressed through '
+  'session/set_config_option with a model config category. '
+  'Will be removed in the next major release.',
+)
 @JsonSerializable()
 class ModelInfo {
   @JsonKey(name: '_meta', includeIfNull: false)
@@ -1408,6 +1711,7 @@ class LoadSessionResponse {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
   @JsonKey(includeIfNull: false)
+  @NullableSessionConfigOptionListConverter()
   final List<SessionConfigOption>? configOptions;
   final SessionModeState? modes;
   final SessionModelState? models;
@@ -1424,6 +1728,7 @@ abstract class SessionStateResponseBase {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
   @JsonKey(includeIfNull: false)
+  @NullableSessionConfigOptionListConverter()
   final List<SessionConfigOption>? configOptions;
   final SessionModeState? modes;
   final SessionModelState? models;
@@ -1501,6 +1806,7 @@ class SetSessionModeResponse {
 class SetSessionConfigOptionResponse {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
+  @SessionConfigOptionListConverter()
   final List<SessionConfigOption> configOptions;
 
   SetSessionConfigOptionResponse({this.meta, required this.configOptions});
@@ -1563,6 +1869,11 @@ class Cost {
   Map<String, dynamic> toJson() => _$CostToJson(this);
 }
 
+@Deprecated(
+  'Not part of the ACP schema. Model selection is expressed through '
+  'session/set_config_option with a model config category. '
+  'Will be removed in the next major release.',
+)
 @JsonSerializable()
 class SetSessionModelResponse {
   @JsonKey(name: '_meta', includeIfNull: false)
@@ -1913,12 +2224,16 @@ abstract class ToolCallContent {}
 class ContentToolCallContent extends ToolCallContent {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
-  @JsonKey(name: 'type', defaultValue: 'content')
-  final String type = 'content';
+  @JsonKey(name: 'type')
+  final String type;
   @ContentBlockConverter()
   final ContentBlock content;
 
-  ContentToolCallContent({this.meta, required this.content});
+  ContentToolCallContent({
+    this.meta,
+    required this.content,
+    this.type = 'content',
+  });
 
   factory ContentToolCallContent.fromJson(Map<String, dynamic> json) =>
       _$ContentToolCallContentFromJson(json);
@@ -1930,8 +2245,8 @@ class ContentToolCallContent extends ToolCallContent {
 class DiffToolCallContent extends ToolCallContent {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
-  @JsonKey(name: 'type', defaultValue: 'diff')
-  final String type = 'diff';
+  @JsonKey(name: 'type')
+  final String type;
   final String newText;
   final String? oldText;
   final String path;
@@ -1941,6 +2256,7 @@ class DiffToolCallContent extends ToolCallContent {
     required this.newText,
     this.oldText,
     required this.path,
+    this.type = 'diff',
   });
 
   factory DiffToolCallContent.fromJson(Map<String, dynamic> json) =>
@@ -1953,11 +2269,15 @@ class DiffToolCallContent extends ToolCallContent {
 class TerminalToolCallContent extends ToolCallContent {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
-  @JsonKey(name: 'type', defaultValue: 'terminal')
-  final String type = 'terminal';
+  @JsonKey(name: 'type')
+  final String type;
   final String terminalId;
 
-  TerminalToolCallContent({this.meta, required this.terminalId});
+  TerminalToolCallContent({
+    this.meta,
+    required this.terminalId,
+    this.type = 'terminal',
+  });
 
   factory TerminalToolCallContent.fromJson(Map<String, dynamic> json) =>
       _$TerminalToolCallContentFromJson(json);
@@ -2285,6 +2605,7 @@ class CurrentModeUpdateSessionUpdate extends SessionUpdate {
 class ConfigOptionUpdate extends SessionUpdate {
   @JsonKey(name: '_meta', includeIfNull: false)
   final Map<String, dynamic>? meta;
+  @SessionConfigOptionListConverter()
   final List<SessionConfigOption> configOptions;
 
   ConfigOptionUpdate({this.meta, required this.configOptions});
@@ -2335,11 +2656,2122 @@ class UnknownSessionUpdate extends SessionUpdate {
   Map<String, dynamic> toJson() => _$UnknownSessionUpdateToJson(this);
 }
 
+// ---------------------------------------------------------------------------
+// Elicitation
+//
+// Agents call `elicitation/create` to request structured input from the user,
+// either through a form or by directing them to a URL. URL elicitations are
+// resolved out of band and completed with an `elicitation/complete`
+// notification.
+//
+// See protocol docs: https://agentclientprotocol.com/protocol/elicitation
+// ---------------------------------------------------------------------------
+
+/// Format constraints for string properties in an elicitation schema.
+enum StringFormat {
+  @JsonValue('email')
+  email,
+  @JsonValue('uri')
+  uri,
+  @JsonValue('date')
+  date,
+  @JsonValue('date-time')
+  dateTime,
+}
+
+/// A titled enum option with a constant value and human-readable title.
+@JsonSerializable()
+class EnumOption {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// The constant value for this option.
+  @JsonKey(name: 'const')
+  final String constValue;
+
+  /// Human-readable title for this option.
+  final String title;
+  final String? description;
+
+  EnumOption({
+    this.meta,
+    required this.constValue,
+    required this.title,
+    this.description,
+  });
+
+  factory EnumOption.fromJson(Map<String, dynamic> json) =>
+      _$EnumOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$EnumOptionToJson(this);
+}
+
+/// Item constraints for a multi-select (`array`) elicitation property.
+abstract class MultiSelectItems {}
+
+/// Multi-select items constrained to a plain list of string values.
+@JsonSerializable()
+class StringMultiSelectItems extends MultiSelectItems {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @JsonKey(name: 'enum')
+  final List<String> enumValues;
+
+  StringMultiSelectItems({this.meta, required this.enumValues});
+
+  factory StringMultiSelectItems.fromJson(Map<String, dynamic> json) =>
+      _$StringMultiSelectItemsFromJson(json);
+
+  Map<String, dynamic> toJson() => _$StringMultiSelectItemsToJson(this);
+}
+
+/// Multi-select items constrained to a list of titled options.
+@JsonSerializable()
+class TitledMultiSelectItems extends MultiSelectItems {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final List<EnumOption> anyOf;
+
+  TitledMultiSelectItems({this.meta, required this.anyOf});
+
+  factory TitledMultiSelectItems.fromJson(Map<String, dynamic> json) =>
+      _$TitledMultiSelectItemsFromJson(json);
+
+  Map<String, dynamic> toJson() => _$TitledMultiSelectItemsToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised multi-select item shapes.
+@JsonSerializable()
+class UnknownMultiSelectItems extends MultiSelectItems {
+  final Map<String, dynamic> rawJson;
+  UnknownMultiSelectItems({required this.rawJson});
+  factory UnknownMultiSelectItems.fromJson(Map<String, dynamic> json) =>
+      _$UnknownMultiSelectItemsFromJson(json);
+  Map<String, dynamic> toJson() => _$UnknownMultiSelectItemsToJson(this);
+}
+
+/// A single property definition inside an [ElicitationSchema].
+///
+/// Each variant corresponds to a JSON Schema `type` value. Single-select
+/// enums use [StringPropertySchema] with `enumValues` or `oneOf` set;
+/// multi-select enums use [MultiSelectPropertySchema].
+abstract class ElicitationPropertySchema {}
+
+@JsonSerializable()
+class StringPropertySchema extends ElicitationPropertySchema {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String? title;
+  final String? description;
+  final int? minLength;
+  final int? maxLength;
+  final String? pattern;
+  final StringFormat? format;
+  @JsonKey(name: 'default')
+  final String? defaultValue;
+  @JsonKey(name: 'enum')
+  final List<String>? enumValues;
+  final List<EnumOption>? oneOf;
+
+  StringPropertySchema({
+    this.meta,
+    this.title,
+    this.description,
+    this.minLength,
+    this.maxLength,
+    this.pattern,
+    this.format,
+    this.defaultValue,
+    this.enumValues,
+    this.oneOf,
+  });
+
+  factory StringPropertySchema.fromJson(Map<String, dynamic> json) =>
+      _$StringPropertySchemaFromJson(json);
+
+  Map<String, dynamic> toJson() => _$StringPropertySchemaToJson(this);
+}
+
+@JsonSerializable()
+class NumberPropertySchema extends ElicitationPropertySchema {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String? title;
+  final String? description;
+  final num? minimum;
+  final num? maximum;
+  @JsonKey(name: 'default')
+  final num? defaultValue;
+
+  NumberPropertySchema({
+    this.meta,
+    this.title,
+    this.description,
+    this.minimum,
+    this.maximum,
+    this.defaultValue,
+  });
+
+  factory NumberPropertySchema.fromJson(Map<String, dynamic> json) =>
+      _$NumberPropertySchemaFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NumberPropertySchemaToJson(this);
+}
+
+@JsonSerializable()
+class IntegerPropertySchema extends ElicitationPropertySchema {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String? title;
+  final String? description;
+  final int? minimum;
+  final int? maximum;
+  @JsonKey(name: 'default')
+  final int? defaultValue;
+
+  IntegerPropertySchema({
+    this.meta,
+    this.title,
+    this.description,
+    this.minimum,
+    this.maximum,
+    this.defaultValue,
+  });
+
+  factory IntegerPropertySchema.fromJson(Map<String, dynamic> json) =>
+      _$IntegerPropertySchemaFromJson(json);
+
+  Map<String, dynamic> toJson() => _$IntegerPropertySchemaToJson(this);
+}
+
+@JsonSerializable()
+class BooleanPropertySchema extends ElicitationPropertySchema {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String? title;
+  final String? description;
+  @JsonKey(name: 'default')
+  final bool? defaultValue;
+
+  BooleanPropertySchema({
+    this.meta,
+    this.title,
+    this.description,
+    this.defaultValue,
+  });
+
+  factory BooleanPropertySchema.fromJson(Map<String, dynamic> json) =>
+      _$BooleanPropertySchemaFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BooleanPropertySchemaToJson(this);
+}
+
+@JsonSerializable()
+class MultiSelectPropertySchema extends ElicitationPropertySchema {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String? title;
+  final String? description;
+  final int? minItems;
+  final int? maxItems;
+  @MultiSelectItemsConverter()
+  final MultiSelectItems items;
+  @JsonKey(name: 'default')
+  final List<String>? defaultValue;
+
+  MultiSelectPropertySchema({
+    this.meta,
+    this.title,
+    this.description,
+    this.minItems,
+    this.maxItems,
+    required this.items,
+    this.defaultValue,
+  });
+
+  factory MultiSelectPropertySchema.fromJson(Map<String, dynamic> json) =>
+      _$MultiSelectPropertySchemaFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MultiSelectPropertySchemaToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised property schema types.
+@JsonSerializable()
+class UnknownPropertySchema extends ElicitationPropertySchema {
+  final Map<String, dynamic> rawJson;
+  UnknownPropertySchema({required this.rawJson});
+  factory UnknownPropertySchema.fromJson(Map<String, dynamic> json) =>
+      _$UnknownPropertySchemaFromJson(json);
+  Map<String, dynamic> toJson() => _$UnknownPropertySchemaToJson(this);
+}
+
+/// A JSON Schema object with primitive-typed properties, as required by the
+/// elicitation specification.
+@JsonSerializable()
+class ElicitationSchema {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// Type discriminator. Always `"object"`.
+  @JsonKey(defaultValue: 'object')
+  final String type;
+  final String? title;
+  final String? description;
+  @ElicitationPropertySchemaMapConverter()
+  final Map<String, ElicitationPropertySchema>? properties;
+  final List<String>? required;
+
+  ElicitationSchema({
+    this.meta,
+    this.type = 'object',
+    this.title,
+    this.description,
+    this.properties,
+    this.required,
+  });
+
+  factory ElicitationSchema.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationSchemaFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationSchemaToJson(this);
+}
+
+/// Request parameters for the `elicitation/create` method.
+///
+/// The scope is one-of: either session-scoped (`sessionId`, optionally
+/// narrowed to a `toolCallId`) or request-scoped (`requestId`, for
+/// elicitations raised outside any session — during authentication, say).
+abstract class CreateElicitationRequest {
+  /// A human-readable message describing what input is needed.
+  String get message;
+}
+
+/// A form elicitation: the client renders [requestedSchema] and collects
+/// matching values from the user.
+@JsonSerializable()
+class ElicitationFormRequest extends CreateElicitationRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final String message;
+
+  /// Session this elicitation is tied to, when session-scoped.
+  final String? sessionId;
+
+  /// Tool call within the session, when the elicitation belongs to one.
+  final String? toolCallId;
+
+  /// Request this elicitation is tied to, when request-scoped.
+  final RequestId? requestId;
+
+  /// The schema describing the values being requested.
+  final ElicitationSchema requestedSchema;
+
+  ElicitationFormRequest({
+    this.meta,
+    required this.message,
+    this.sessionId,
+    this.toolCallId,
+    this.requestId,
+    required this.requestedSchema,
+  });
+
+  factory ElicitationFormRequest.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationFormRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationFormRequestToJson(this);
+}
+
+/// A URL elicitation: the client directs the user to [url]. Completion is
+/// signalled out of band via `elicitation/complete`.
+@JsonSerializable()
+class ElicitationUrlRequest extends CreateElicitationRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final String message;
+  final String? sessionId;
+  final String? toolCallId;
+  final RequestId? requestId;
+
+  /// Identifier used to correlate the later `elicitation/complete`
+  /// notification with this request.
+  final String elicitationId;
+
+  /// The URL the user should be directed to.
+  final String url;
+
+  ElicitationUrlRequest({
+    this.meta,
+    required this.message,
+    this.sessionId,
+    this.toolCallId,
+    this.requestId,
+    required this.elicitationId,
+    required this.url,
+  });
+
+  factory ElicitationUrlRequest.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationUrlRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationUrlRequestToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised elicitation modes.
+@JsonSerializable()
+class UnknownElicitationRequest extends CreateElicitationRequest {
+  final Map<String, dynamic> rawJson;
+  UnknownElicitationRequest({required this.rawJson});
+
+  @override
+  String get message => (rawJson['message'] as String?) ?? '';
+
+  factory UnknownElicitationRequest.fromJson(Map<String, dynamic> json) =>
+      _$UnknownElicitationRequestFromJson(json);
+  Map<String, dynamic> toJson() => _$UnknownElicitationRequestToJson(this);
+}
+
+/// Response to the `elicitation/create` method.
+abstract class CreateElicitationResponse {}
+
+/// The user submitted the elicitation.
+@JsonSerializable()
+class ElicitationAcceptResponse extends CreateElicitationResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// The submitted values, keyed by property name. Values are constrained by
+  /// the schema to `String`, `num`, `int`, `bool`, or `List<String>`.
+  final Map<String, dynamic>? content;
+
+  ElicitationAcceptResponse({this.meta, this.content});
+
+  factory ElicitationAcceptResponse.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationAcceptResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationAcceptResponseToJson(this);
+}
+
+/// The user explicitly declined to provide the requested input.
+@JsonSerializable()
+class ElicitationDeclineResponse extends CreateElicitationResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  ElicitationDeclineResponse({this.meta});
+
+  factory ElicitationDeclineResponse.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationDeclineResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationDeclineResponseToJson(this);
+}
+
+/// The elicitation was dismissed without an explicit decision.
+@JsonSerializable()
+class ElicitationCancelResponse extends CreateElicitationResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  ElicitationCancelResponse({this.meta});
+
+  factory ElicitationCancelResponse.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationCancelResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationCancelResponseToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised elicitation actions.
+@JsonSerializable()
+class UnknownElicitationResponse extends CreateElicitationResponse {
+  final Map<String, dynamic> rawJson;
+  UnknownElicitationResponse({required this.rawJson});
+  factory UnknownElicitationResponse.fromJson(Map<String, dynamic> json) =>
+      _$UnknownElicitationResponseFromJson(json);
+  Map<String, dynamic> toJson() => _$UnknownElicitationResponseToJson(this);
+}
+
+/// Notification parameters for `elicitation/complete`.
+///
+/// Sent by the agent to tell the client that a URL elicitation has been
+/// resolved out of band and its UI can be dismissed.
+@JsonSerializable()
+class CompleteElicitationNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// The elicitation being completed.
+  final String elicitationId;
+
+  CompleteElicitationNotification({this.meta, required this.elicitationId});
+
+  factory CompleteElicitationNotification.fromJson(Map<String, dynamic> json) =>
+      _$CompleteElicitationNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() =>
+      _$CompleteElicitationNotificationToJson(this);
+}
+
+/// Client capability marker for form-mode elicitations.
+@JsonSerializable()
+class ElicitationFormCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  ElicitationFormCapabilities({this.meta});
+
+  factory ElicitationFormCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationFormCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationFormCapabilitiesToJson(this);
+}
+
+/// Client capability marker for URL-mode elicitations.
+@JsonSerializable()
+class ElicitationUrlCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  ElicitationUrlCapabilities({this.meta});
+
+  factory ElicitationUrlCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationUrlCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationUrlCapabilitiesToJson(this);
+}
+
+/// Elicitation capabilities advertised by the client during initialization.
+///
+/// An omitted sub-capability means the client cannot render that mode; the
+/// agent should not send elicitations of that kind.
+@JsonSerializable()
+class ElicitationCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final ElicitationFormCapabilities? form;
+  final ElicitationUrlCapabilities? url;
+
+  ElicitationCapabilities({this.meta, this.form, this.url});
+
+  factory ElicitationCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ElicitationCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ElicitationCapabilitiesToJson(this);
+}
+
+// ---------------------------------------------------------------------------
+// Capability markers
+//
+// Empty objects whose presence is the signal. Absent or null means the
+// capability is not offered.
+// ---------------------------------------------------------------------------
+
+/// How character offsets in [Position] are counted.
+enum PositionEncodingKind {
+  @JsonValue('utf-8')
+  utf8,
+  @JsonValue('utf-16')
+  utf16,
+  @JsonValue('utf-32')
+  utf32,
+}
+
+/// Agent supports `logout`.
+@JsonSerializable()
+class LogoutCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  LogoutCapabilities({this.meta});
+
+  factory LogoutCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$LogoutCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$LogoutCapabilitiesToJson(this);
+}
+
+/// Agent supports `session/close`.
+@JsonSerializable()
+class SessionCloseCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SessionCloseCapabilities({this.meta});
+
+  factory SessionCloseCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$SessionCloseCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionCloseCapabilitiesToJson(this);
+}
+
+/// Agent supports `session/delete`.
+@JsonSerializable()
+class SessionDeleteCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SessionDeleteCapabilities({this.meta});
+
+  factory SessionDeleteCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$SessionDeleteCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionDeleteCapabilitiesToJson(this);
+}
+
+/// Agent accepts additional workspace roots on session creation.
+@JsonSerializable()
+class SessionAdditionalDirectoriesCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SessionAdditionalDirectoriesCapabilities({this.meta});
+
+  factory SessionAdditionalDirectoriesCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$SessionAdditionalDirectoriesCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SessionAdditionalDirectoriesCapabilitiesToJson(this);
+}
+
+/// Client can render boolean session config options.
+@JsonSerializable()
+class BooleanConfigOptionCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  BooleanConfigOptionCapabilities({this.meta});
+
+  factory BooleanConfigOptionCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$BooleanConfigOptionCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$BooleanConfigOptionCapabilitiesToJson(this);
+}
+
+/// Client supports plan updates.
+@JsonSerializable()
+class PlanCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  PlanCapabilities({this.meta});
+
+  factory PlanCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$PlanCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PlanCapabilitiesToJson(this);
+}
+
+/// Authentication capabilities advertised by the agent.
+@JsonSerializable()
+class AgentAuthCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final LogoutCapabilities? logout;
+
+  AgentAuthCapabilities({this.meta, this.logout});
+
+  factory AgentAuthCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$AgentAuthCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AgentAuthCapabilitiesToJson(this);
+}
+
+/// Authentication capabilities advertised by the client.
+@JsonSerializable()
+class AuthCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  /// Client can complete terminal-based authentication flows.
+  @JsonKey(defaultValue: false)
+  final bool terminal;
+
+  AuthCapabilities({this.meta, this.terminal = false});
+
+  factory AuthCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$AuthCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AuthCapabilitiesToJson(this);
+}
+
+/// Session config option kinds the client can render.
+@JsonSerializable()
+class SessionConfigOptionsCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final BooleanConfigOptionCapabilities? boolean;
+
+  SessionConfigOptionsCapabilities({this.meta, this.boolean});
+
+  factory SessionConfigOptionsCapabilities.fromJson(
+    Map<String, dynamic> json,
+  ) => _$SessionConfigOptionsCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() =>
+      _$SessionConfigOptionsCapabilitiesToJson(this);
+}
+
+/// Session-related capabilities advertised by the client.
+@JsonSerializable()
+class ClientSessionCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final SessionConfigOptionsCapabilities? configOptions;
+
+  ClientSessionCapabilities({this.meta, this.configOptions});
+
+  factory ClientSessionCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ClientSessionCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ClientSessionCapabilitiesToJson(this);
+}
+
+// ---------------------------------------------------------------------------
+// Providers
+//
+// Lets a client inspect and configure the LLM providers an agent can reach.
+// ---------------------------------------------------------------------------
+
+/// Wire protocol an LLM endpoint speaks.
+///
+/// An open string union: `anthropic`, `openai`, `azure`, `vertex`, and
+/// `bedrock` are the known values, but agents may report others.
+typedef LlmProtocol = String;
+
+/// Known [LlmProtocol] values.
+abstract final class LlmProtocols {
+  static const anthropic = 'anthropic';
+  static const openai = 'openai';
+  static const azure = 'azure';
+  static const vertex = 'vertex';
+  static const bedrock = 'bedrock';
+}
+
+/// The endpoint a provider is currently pointed at.
+@JsonSerializable()
+class ProviderCurrentConfig {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final LlmProtocol apiType;
+  final String baseUrl;
+
+  ProviderCurrentConfig({
+    this.meta,
+    required this.apiType,
+    required this.baseUrl,
+  });
+
+  factory ProviderCurrentConfig.fromJson(Map<String, dynamic> json) =>
+      _$ProviderCurrentConfigFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ProviderCurrentConfigToJson(this);
+}
+
+/// A provider the agent knows about.
+@JsonSerializable()
+class ProviderInfo {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String providerId;
+
+  /// Protocols this provider can speak.
+  final List<LlmProtocol> supported;
+
+  /// Whether the agent needs this provider configured to function.
+  final bool required;
+
+  /// Present when the provider is configured.
+  final ProviderCurrentConfig? current;
+
+  ProviderInfo({
+    this.meta,
+    required this.providerId,
+    required this.supported,
+    required this.required,
+    this.current,
+  });
+
+  factory ProviderInfo.fromJson(Map<String, dynamic> json) =>
+      _$ProviderInfoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ProviderInfoToJson(this);
+}
+
+/// Agent capability marker for the `providers/*` methods.
+@JsonSerializable()
+class ProvidersCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  ProvidersCapabilities({this.meta});
+
+  factory ProvidersCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ProvidersCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ProvidersCapabilitiesToJson(this);
+}
+
+/// Request parameters for `providers/list`.
+@JsonSerializable()
+class ListProvidersRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  ListProvidersRequest({this.meta});
+
+  factory ListProvidersRequest.fromJson(Map<String, dynamic> json) =>
+      _$ListProvidersRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ListProvidersRequestToJson(this);
+}
+
+/// Response to `providers/list`.
+@JsonSerializable()
+class ListProvidersResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final List<ProviderInfo> providers;
+
+  ListProvidersResponse({this.meta, required this.providers});
+
+  factory ListProvidersResponse.fromJson(Map<String, dynamic> json) =>
+      _$ListProvidersResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ListProvidersResponseToJson(this);
+}
+
+/// Request parameters for `providers/set`.
+///
+/// [headers] typically carries credentials, so avoid logging this object.
+@JsonSerializable()
+class SetProviderRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String providerId;
+  final LlmProtocol apiType;
+  final String baseUrl;
+
+  /// Extra headers to send to the endpoint, commonly including credentials.
+  @JsonKey(includeIfNull: false)
+  final Map<String, String>? headers;
+
+  SetProviderRequest({
+    this.meta,
+    required this.providerId,
+    required this.apiType,
+    required this.baseUrl,
+    this.headers,
+  });
+
+  factory SetProviderRequest.fromJson(Map<String, dynamic> json) =>
+      _$SetProviderRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SetProviderRequestToJson(this);
+
+  /// Redacts [headers] so the request can be logged safely.
+  @override
+  String toString() =>
+      'SetProviderRequest(providerId: $providerId, apiType: $apiType, '
+      'baseUrl: $baseUrl, headers: ${headers == null ? null : '<redacted>'})';
+}
+
+/// Response to `providers/set`.
+@JsonSerializable()
+class SetProviderResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  SetProviderResponse({this.meta});
+
+  factory SetProviderResponse.fromJson(Map<String, dynamic> json) =>
+      _$SetProviderResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SetProviderResponseToJson(this);
+}
+
+/// Request parameters for `providers/disable`.
+@JsonSerializable()
+class DisableProviderRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String providerId;
+
+  DisableProviderRequest({this.meta, required this.providerId});
+
+  factory DisableProviderRequest.fromJson(Map<String, dynamic> json) =>
+      _$DisableProviderRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DisableProviderRequestToJson(this);
+}
+
+/// Response to `providers/disable`.
+@JsonSerializable()
+class DisableProviderResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  DisableProviderResponse({this.meta});
+
+  factory DisableProviderResponse.fromJson(Map<String, dynamic> json) =>
+      _$DisableProviderResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DisableProviderResponseToJson(this);
+}
+
+// ---------------------------------------------------------------------------
+// Text documents
+//
+// Position and Range are shared by the `document/did*` notifications and the
+// `nes/*` methods.
+// ---------------------------------------------------------------------------
+
+/// A position inside a text document.
+@JsonSerializable()
+class Position {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final int line;
+  final int character;
+
+  Position({this.meta, required this.line, required this.character});
+
+  factory Position.fromJson(Map<String, dynamic> json) =>
+      _$PositionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PositionToJson(this);
+}
+
+/// A span between two [Position]s.
+@JsonSerializable()
+class Range {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final Position start;
+  final Position end;
+
+  Range({this.meta, required this.start, required this.end});
+
+  factory Range.fromJson(Map<String, dynamic> json) => _$RangeFromJson(json);
+
+  Map<String, dynamic> toJson() => _$RangeToJson(this);
+}
+
+/// How a client reports document edits.
+enum TextDocumentSyncKind {
+  /// Every change carries the document's full text.
+  @JsonValue('full')
+  full,
+
+  /// Changes carry only the edited range.
+  @JsonValue('incremental')
+  incremental,
+}
+
+/// A single edit within a `document/didChange` notification.
+///
+/// A null [range] means [text] replaces the whole document.
+@JsonSerializable()
+class TextDocumentContentChangeEvent {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final Range? range;
+  final String text;
+
+  TextDocumentContentChangeEvent({this.meta, this.range, required this.text});
+
+  factory TextDocumentContentChangeEvent.fromJson(Map<String, dynamic> json) =>
+      _$TextDocumentContentChangeEventFromJson(json);
+
+  Map<String, dynamic> toJson() =>
+      _$TextDocumentContentChangeEventToJson(this);
+}
+
+/// Notification parameters for `document/didOpen`.
+@JsonSerializable()
+class DidOpenDocumentNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final String uri;
+  final String languageId;
+  final int version;
+  final String text;
+
+  DidOpenDocumentNotification({
+    this.meta,
+    required this.sessionId,
+    required this.uri,
+    required this.languageId,
+    required this.version,
+    required this.text,
+  });
+
+  factory DidOpenDocumentNotification.fromJson(Map<String, dynamic> json) =>
+      _$DidOpenDocumentNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DidOpenDocumentNotificationToJson(this);
+}
+
+/// Notification parameters for `document/didChange`.
+@JsonSerializable()
+class DidChangeDocumentNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final String uri;
+  final int version;
+  final List<TextDocumentContentChangeEvent> contentChanges;
+
+  DidChangeDocumentNotification({
+    this.meta,
+    required this.sessionId,
+    required this.uri,
+    required this.version,
+    required this.contentChanges,
+  });
+
+  factory DidChangeDocumentNotification.fromJson(Map<String, dynamic> json) =>
+      _$DidChangeDocumentNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DidChangeDocumentNotificationToJson(this);
+}
+
+/// Notification parameters for `document/didClose`.
+@JsonSerializable()
+class DidCloseDocumentNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final String uri;
+
+  DidCloseDocumentNotification({
+    this.meta,
+    required this.sessionId,
+    required this.uri,
+  });
+
+  factory DidCloseDocumentNotification.fromJson(Map<String, dynamic> json) =>
+      _$DidCloseDocumentNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DidCloseDocumentNotificationToJson(this);
+}
+
+/// Notification parameters for `document/didSave`.
+@JsonSerializable()
+class DidSaveDocumentNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final String uri;
+
+  DidSaveDocumentNotification({
+    this.meta,
+    required this.sessionId,
+    required this.uri,
+  });
+
+  factory DidSaveDocumentNotification.fromJson(Map<String, dynamic> json) =>
+      _$DidSaveDocumentNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DidSaveDocumentNotificationToJson(this);
+}
+
+/// Notification parameters for `document/didFocus`.
+@JsonSerializable()
+class DidFocusDocumentNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final String uri;
+  final int version;
+
+  /// Where the cursor is.
+  final Position position;
+
+  /// The portion of the document on screen.
+  final Range visibleRange;
+
+  DidFocusDocumentNotification({
+    this.meta,
+    required this.sessionId,
+    required this.uri,
+    required this.version,
+    required this.position,
+    required this.visibleRange,
+  });
+
+  factory DidFocusDocumentNotification.fromJson(Map<String, dynamic> json) =>
+      _$DidFocusDocumentNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DidFocusDocumentNotificationToJson(this);
+}
+
+// ---------------------------------------------------------------------------
+// MCP over ACP
+//
+// Tunnels MCP JSON-RPC traffic through the ACP connection, so an agent can
+// reach an MCP server the client already holds a connection to instead of
+// opening its own transport.
+//
+// `mcp/message` is unusual: it appears on both the agent and client method
+// tables, and arrives as either a request or a notification depending on
+// whether the tunnelled MCP message carries an id.
+// ---------------------------------------------------------------------------
+
+/// Identifies an MCP server the client can connect to on the agent's behalf.
+typedef McpServerAcpId = String;
+
+/// Identifies an established MCP connection.
+typedef McpConnectionId = String;
+
+/// An MCP server reached over the ACP connection itself.
+@JsonSerializable()
+class AcpMcpServer extends McpServerBase {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String name;
+  final McpServerAcpId serverId;
+
+  AcpMcpServer({this.meta, required this.name, required this.serverId});
+
+  factory AcpMcpServer.fromJson(Map<String, dynamic> json) =>
+      _$AcpMcpServerFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AcpMcpServerToJson(this);
+}
+
+/// Request parameters for `mcp/connect`.
+@JsonSerializable()
+class ConnectMcpRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final McpServerAcpId serverId;
+
+  ConnectMcpRequest({this.meta, required this.serverId});
+
+  factory ConnectMcpRequest.fromJson(Map<String, dynamic> json) =>
+      _$ConnectMcpRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ConnectMcpRequestToJson(this);
+}
+
+/// Response to `mcp/connect`, carrying the handle for later messages.
+@JsonSerializable()
+class ConnectMcpResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final McpConnectionId connectionId;
+
+  ConnectMcpResponse({this.meta, required this.connectionId});
+
+  factory ConnectMcpResponse.fromJson(Map<String, dynamic> json) =>
+      _$ConnectMcpResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ConnectMcpResponseToJson(this);
+}
+
+/// A tunnelled MCP message sent as a request, expecting a reply.
+@JsonSerializable()
+class MessageMcpRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final McpConnectionId connectionId;
+
+  /// The MCP method being tunnelled, e.g. `tools/list`.
+  final String method;
+
+  /// The tunnelled MCP params, passed through untouched.
+  @JsonKey(includeIfNull: false)
+  final Map<String, dynamic>? params;
+
+  MessageMcpRequest({
+    this.meta,
+    required this.connectionId,
+    required this.method,
+    this.params,
+  });
+
+  factory MessageMcpRequest.fromJson(Map<String, dynamic> json) =>
+      _$MessageMcpRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MessageMcpRequestToJson(this);
+}
+
+/// A tunnelled MCP message sent as a notification, expecting no reply.
+@JsonSerializable()
+class MessageMcpNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final McpConnectionId connectionId;
+  final String method;
+  @JsonKey(includeIfNull: false)
+  final Map<String, dynamic>? params;
+
+  MessageMcpNotification({
+    this.meta,
+    required this.connectionId,
+    required this.method,
+    this.params,
+  });
+
+  factory MessageMcpNotification.fromJson(Map<String, dynamic> json) =>
+      _$MessageMcpNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MessageMcpNotificationToJson(this);
+}
+
+/// Request parameters for `mcp/disconnect`.
+@JsonSerializable()
+class DisconnectMcpRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final McpConnectionId connectionId;
+
+  DisconnectMcpRequest({this.meta, required this.connectionId});
+
+  factory DisconnectMcpRequest.fromJson(Map<String, dynamic> json) =>
+      _$DisconnectMcpRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DisconnectMcpRequestToJson(this);
+}
+
+/// Response to `mcp/disconnect`.
+@JsonSerializable()
+class DisconnectMcpResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  DisconnectMcpResponse({this.meta});
+
+  factory DisconnectMcpResponse.fromJson(Map<String, dynamic> json) =>
+      _$DisconnectMcpResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DisconnectMcpResponseToJson(this);
+}
+
+// ---------------------------------------------------------------------------
+// Next Edit Suggestions (NES)
+//
+// The agent proposes the edit a developer is likely to make next, based on
+// what they just did. A NES session is separate from a prompt session: start
+// one with `nes/start`, ask for suggestions with `nes/suggest` as the user
+// types, report the outcome with `nes/accept` or `nes/reject`, and tear it
+// down with `nes/close`.
+//
+// Suggestion quality depends on the agent seeing current buffer state, which
+// is what the `document/did*` notifications provide.
+// ---------------------------------------------------------------------------
+
+/// Identifies a suggestion within a NES session.
+typedef NesSuggestionId = String;
+
+/// A folder in the client's workspace.
+@JsonSerializable()
+class WorkspaceFolder {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String uri;
+  final String name;
+
+  WorkspaceFolder({this.meta, required this.uri, required this.name});
+
+  factory WorkspaceFolder.fromJson(Map<String, dynamic> json) =>
+      _$WorkspaceFolderFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkspaceFolderToJson(this);
+}
+
+/// The repository backing a NES session, when there is one.
+@JsonSerializable()
+class NesRepository {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String name;
+  final String owner;
+  final String remoteUrl;
+
+  NesRepository({
+    this.meta,
+    required this.name,
+    required this.owner,
+    required this.remoteUrl,
+  });
+
+  factory NesRepository.fromJson(Map<String, dynamic> json) =>
+      _$NesRepositoryFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRepositoryToJson(this);
+}
+
+/// What prompted a `nes/suggest` call.
+enum NesTriggerKind {
+  /// Typing or cursor movement.
+  @JsonValue('automatic')
+  automatic,
+
+  /// A diagnostic appeared.
+  @JsonValue('diagnostic')
+  diagnostic,
+
+  /// The user explicitly asked.
+  @JsonValue('manual')
+  manual,
+}
+
+/// Why a suggestion was not taken.
+enum NesRejectReason {
+  /// The user actively dismissed it.
+  @JsonValue('rejected')
+  rejected,
+
+  /// It was never acted on.
+  @JsonValue('ignored')
+  ignored,
+
+  /// A newer suggestion superseded it.
+  @JsonValue('replaced')
+  replaced,
+
+  /// The request was cancelled before resolution.
+  @JsonValue('cancelled')
+  cancelled,
+}
+
+/// Severity of a diagnostic passed as NES context.
+enum NesDiagnosticSeverity {
+  @JsonValue('error')
+  error,
+  @JsonValue('warning')
+  warning,
+  @JsonValue('information')
+  information,
+  @JsonValue('hint')
+  hint,
+}
+
+/// A contiguous slice of a file, used as related-snippet context.
+@JsonSerializable()
+class NesExcerpt {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final int startLine;
+  final int endLine;
+  final String text;
+
+  NesExcerpt({
+    this.meta,
+    required this.startLine,
+    required this.endLine,
+    required this.text,
+  });
+
+  factory NesExcerpt.fromJson(Map<String, dynamic> json) =>
+      _$NesExcerptFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesExcerptToJson(this);
+}
+
+/// A single replacement within an edit suggestion.
+@JsonSerializable()
+class NesTextEdit {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final Range range;
+  final String newText;
+
+  NesTextEdit({this.meta, required this.range, required this.newText});
+
+  factory NesTextEdit.fromJson(Map<String, dynamic> json) =>
+      _$NesTextEditFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesTextEditToJson(this);
+}
+
+/// A file the user touched recently.
+@JsonSerializable()
+class NesRecentFile {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String uri;
+  final String languageId;
+  final String text;
+
+  NesRecentFile({
+    this.meta,
+    required this.uri,
+    required this.languageId,
+    required this.text,
+  });
+
+  factory NesRecentFile.fromJson(Map<String, dynamic> json) =>
+      _$NesRecentFileFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRecentFileToJson(this);
+}
+
+/// Excerpts from a file related to what the user is editing.
+@JsonSerializable()
+class NesRelatedSnippet {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String uri;
+  final List<NesExcerpt> excerpts;
+
+  NesRelatedSnippet({this.meta, required this.uri, required this.excerpts});
+
+  factory NesRelatedSnippet.fromJson(Map<String, dynamic> json) =>
+      _$NesRelatedSnippetFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRelatedSnippetToJson(this);
+}
+
+/// A recent edit, expressed as a unified diff.
+@JsonSerializable()
+class NesEditHistoryEntry {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String uri;
+  final String diff;
+
+  NesEditHistoryEntry({this.meta, required this.uri, required this.diff});
+
+  factory NesEditHistoryEntry.fromJson(Map<String, dynamic> json) =>
+      _$NesEditHistoryEntryFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesEditHistoryEntryToJson(this);
+}
+
+/// Something the user did, with when and where.
+@JsonSerializable()
+class NesUserAction {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String action;
+  final String uri;
+  final Position position;
+
+  /// Milliseconds since the Unix epoch.
+  final int timestampMs;
+
+  NesUserAction({
+    this.meta,
+    required this.action,
+    required this.uri,
+    required this.position,
+    required this.timestampMs,
+  });
+
+  factory NesUserAction.fromJson(Map<String, dynamic> json) =>
+      _$NesUserActionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesUserActionToJson(this);
+}
+
+/// A file currently open in the editor.
+@JsonSerializable()
+class NesOpenFile {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String uri;
+  final String languageId;
+  final Range? visibleRange;
+
+  /// Milliseconds since the Unix epoch, when this file last had focus.
+  final int? lastFocusedMs;
+
+  NesOpenFile({
+    this.meta,
+    required this.uri,
+    required this.languageId,
+    this.visibleRange,
+    this.lastFocusedMs,
+  });
+
+  factory NesOpenFile.fromJson(Map<String, dynamic> json) =>
+      _$NesOpenFileFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesOpenFileToJson(this);
+}
+
+/// A diagnostic the agent may use to inform a suggestion.
+@JsonSerializable()
+class NesDiagnostic {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String uri;
+  final Range range;
+  final NesDiagnosticSeverity severity;
+  final String message;
+
+  NesDiagnostic({
+    this.meta,
+    required this.uri,
+    required this.range,
+    required this.severity,
+    required this.message,
+  });
+
+  factory NesDiagnostic.fromJson(Map<String, dynamic> json) =>
+      _$NesDiagnosticFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDiagnosticToJson(this);
+}
+
+/// Optional context a client can attach to `nes/suggest`.
+///
+/// Every field is optional; send only what the agent advertised it accepts
+/// via [NesContextCapabilities].
+@JsonSerializable()
+class NesSuggestContext {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final List<NesRecentFile>? recentFiles;
+  final List<NesRelatedSnippet>? relatedSnippets;
+  final List<NesEditHistoryEntry>? editHistory;
+  final List<NesUserAction>? userActions;
+  final List<NesOpenFile>? openFiles;
+  final List<NesDiagnostic>? diagnostics;
+
+  NesSuggestContext({
+    this.meta,
+    this.recentFiles,
+    this.relatedSnippets,
+    this.editHistory,
+    this.userActions,
+    this.openFiles,
+    this.diagnostics,
+  });
+
+  factory NesSuggestContext.fromJson(Map<String, dynamic> json) =>
+      _$NesSuggestContextFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesSuggestContextToJson(this);
+}
+
+/// A proposed next edit, discriminated on `kind`.
+abstract class NesSuggestion {
+  /// Identifies this suggestion for `nes/accept` and `nes/reject`.
+  String get id;
+
+  /// The document the suggestion applies to.
+  String get uri;
+}
+
+/// Apply [edits] to [uri].
+@JsonSerializable()
+class NesEditSuggestion extends NesSuggestion {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final String id;
+  @override
+  final String uri;
+  final List<NesTextEdit> edits;
+
+  /// Where to leave the cursor once the edits are applied.
+  final Position? cursorPosition;
+
+  NesEditSuggestion({
+    this.meta,
+    required this.id,
+    required this.uri,
+    required this.edits,
+    this.cursorPosition,
+  });
+
+  factory NesEditSuggestion.fromJson(Map<String, dynamic> json) =>
+      _$NesEditSuggestionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesEditSuggestionToJson(this);
+}
+
+/// Move the cursor to [position], without editing.
+@JsonSerializable()
+class NesJumpSuggestion extends NesSuggestion {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final String id;
+  @override
+  final String uri;
+  final Position position;
+
+  NesJumpSuggestion({
+    this.meta,
+    required this.id,
+    required this.uri,
+    required this.position,
+  });
+
+  factory NesJumpSuggestion.fromJson(Map<String, dynamic> json) =>
+      _$NesJumpSuggestionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesJumpSuggestionToJson(this);
+}
+
+/// Rename the symbol at [position] to [newName].
+@JsonSerializable()
+class NesRenameSuggestion extends NesSuggestion {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final String id;
+  @override
+  final String uri;
+  final Position position;
+  final String newName;
+
+  NesRenameSuggestion({
+    this.meta,
+    required this.id,
+    required this.uri,
+    required this.position,
+    required this.newName,
+  });
+
+  factory NesRenameSuggestion.fromJson(Map<String, dynamic> json) =>
+      _$NesRenameSuggestionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRenameSuggestionToJson(this);
+}
+
+/// Replace occurrences of [search] with [replace].
+@JsonSerializable()
+class NesSearchAndReplaceSuggestion extends NesSuggestion {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @override
+  final String id;
+  @override
+  final String uri;
+  final String search;
+  final String replace;
+
+  /// Whether [search] is a regular expression.
+  final bool? isRegex;
+
+  NesSearchAndReplaceSuggestion({
+    this.meta,
+    required this.id,
+    required this.uri,
+    required this.search,
+    required this.replace,
+    this.isRegex,
+  });
+
+  factory NesSearchAndReplaceSuggestion.fromJson(Map<String, dynamic> json) =>
+      _$NesSearchAndReplaceSuggestionFromJson(json);
+
+  Map<String, dynamic> toJson() =>
+      _$NesSearchAndReplaceSuggestionToJson(this);
+}
+
+/// Forward-compatible fallback for unrecognised suggestion kinds.
+@JsonSerializable()
+class UnknownNesSuggestion extends NesSuggestion {
+  final Map<String, dynamic> rawJson;
+  UnknownNesSuggestion({required this.rawJson});
+
+  @override
+  String get id => (rawJson['id'] as String?) ?? '';
+  @override
+  String get uri => (rawJson['uri'] as String?) ?? '';
+
+  factory UnknownNesSuggestion.fromJson(Map<String, dynamic> json) =>
+      _$UnknownNesSuggestionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$UnknownNesSuggestionToJson(this);
+}
+
+/// Client can act on `jump` suggestions.
+@JsonSerializable()
+class NesJumpCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesJumpCapabilities({this.meta});
+
+  factory NesJumpCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesJumpCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesJumpCapabilitiesToJson(this);
+}
+
+/// Client can act on `rename` suggestions.
+@JsonSerializable()
+class NesRenameCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesRenameCapabilities({this.meta});
+
+  factory NesRenameCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesRenameCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRenameCapabilitiesToJson(this);
+}
+
+/// Client can act on `searchAndReplace` suggestions.
+@JsonSerializable()
+class NesSearchAndReplaceCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesSearchAndReplaceCapabilities({this.meta});
+
+  factory NesSearchAndReplaceCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesSearchAndReplaceCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesSearchAndReplaceCapabilitiesToJson(this);
+}
+
+/// Agent accepts recent files as context.
+@JsonSerializable()
+class NesRecentFilesCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesRecentFilesCapabilities({this.meta});
+
+  factory NesRecentFilesCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesRecentFilesCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRecentFilesCapabilitiesToJson(this);
+}
+
+/// Agent accepts related snippets as context.
+@JsonSerializable()
+class NesRelatedSnippetsCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesRelatedSnippetsCapabilities({this.meta});
+
+  factory NesRelatedSnippetsCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesRelatedSnippetsCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesRelatedSnippetsCapabilitiesToJson(this);
+}
+
+/// Agent accepts edit history as context.
+@JsonSerializable()
+class NesEditHistoryCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesEditHistoryCapabilities({this.meta});
+
+  factory NesEditHistoryCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesEditHistoryCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesEditHistoryCapabilitiesToJson(this);
+}
+
+/// Agent accepts user actions as context.
+@JsonSerializable()
+class NesUserActionsCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesUserActionsCapabilities({this.meta});
+
+  factory NesUserActionsCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesUserActionsCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesUserActionsCapabilitiesToJson(this);
+}
+
+/// Agent accepts open files as context.
+@JsonSerializable()
+class NesOpenFilesCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesOpenFilesCapabilities({this.meta});
+
+  factory NesOpenFilesCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesOpenFilesCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesOpenFilesCapabilitiesToJson(this);
+}
+
+/// Agent accepts diagnostics as context.
+@JsonSerializable()
+class NesDiagnosticsCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesDiagnosticsCapabilities({this.meta});
+
+  factory NesDiagnosticsCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDiagnosticsCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDiagnosticsCapabilitiesToJson(this);
+}
+
+/// Agent consumes `document/didOpen`.
+@JsonSerializable()
+class NesDocumentDidOpenCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesDocumentDidOpenCapabilities({this.meta});
+
+  factory NesDocumentDidOpenCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDocumentDidOpenCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDocumentDidOpenCapabilitiesToJson(this);
+}
+
+/// Agent consumes `document/didChange`.
+@JsonSerializable()
+class NesDocumentDidChangeCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesDocumentDidChangeCapabilities({this.meta});
+
+  factory NesDocumentDidChangeCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDocumentDidChangeCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDocumentDidChangeCapabilitiesToJson(this);
+}
+
+/// Agent consumes `document/didClose`.
+@JsonSerializable()
+class NesDocumentDidCloseCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesDocumentDidCloseCapabilities({this.meta});
+
+  factory NesDocumentDidCloseCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDocumentDidCloseCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDocumentDidCloseCapabilitiesToJson(this);
+}
+
+/// Agent consumes `document/didSave`.
+@JsonSerializable()
+class NesDocumentDidSaveCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesDocumentDidSaveCapabilities({this.meta});
+
+  factory NesDocumentDidSaveCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDocumentDidSaveCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDocumentDidSaveCapabilitiesToJson(this);
+}
+
+/// Agent consumes `document/didFocus`.
+@JsonSerializable()
+class NesDocumentDidFocusCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  NesDocumentDidFocusCapabilities({this.meta});
+
+  factory NesDocumentDidFocusCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDocumentDidFocusCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDocumentDidFocusCapabilitiesToJson(this);
+}
+
+/// Which document events an agent consumes.
+@JsonSerializable()
+class NesDocumentEventCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final NesDocumentDidOpenCapabilities? didOpen;
+  final NesDocumentDidChangeCapabilities? didChange;
+  final NesDocumentDidCloseCapabilities? didClose;
+  final NesDocumentDidSaveCapabilities? didSave;
+  final NesDocumentDidFocusCapabilities? didFocus;
+
+  NesDocumentEventCapabilities({
+    this.meta,
+    this.didOpen,
+    this.didChange,
+    this.didClose,
+    this.didSave,
+    this.didFocus,
+  });
+
+  factory NesDocumentEventCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesDocumentEventCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesDocumentEventCapabilitiesToJson(this);
+}
+
+/// Which events an agent consumes.
+@JsonSerializable()
+class NesEventCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final NesDocumentEventCapabilities? document;
+
+  NesEventCapabilities({this.meta, this.document});
+
+  factory NesEventCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesEventCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesEventCapabilitiesToJson(this);
+}
+
+/// Which kinds of context an agent accepts on `nes/suggest`.
+@JsonSerializable()
+class NesContextCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final NesRecentFilesCapabilities? recentFiles;
+  final NesRelatedSnippetsCapabilities? relatedSnippets;
+  final NesEditHistoryCapabilities? editHistory;
+  final NesUserActionsCapabilities? userActions;
+  final NesOpenFilesCapabilities? openFiles;
+  final NesDiagnosticsCapabilities? diagnostics;
+
+  NesContextCapabilities({
+    this.meta,
+    this.recentFiles,
+    this.relatedSnippets,
+    this.editHistory,
+    this.userActions,
+    this.openFiles,
+    this.diagnostics,
+  });
+
+  factory NesContextCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesContextCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesContextCapabilitiesToJson(this);
+}
+
+/// NES capabilities advertised by the agent during initialization.
+@JsonSerializable()
+class NesCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final NesEventCapabilities? events;
+  final NesContextCapabilities? context;
+
+  NesCapabilities({this.meta, this.events, this.context});
+
+  factory NesCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$NesCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$NesCapabilitiesToJson(this);
+}
+
+/// NES suggestion kinds the client can act on.
+///
+/// An agent should only return a suggestion kind the client advertised.
+@JsonSerializable()
+class ClientNesCapabilities {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final NesJumpCapabilities? jump;
+  final NesRenameCapabilities? rename;
+  final NesSearchAndReplaceCapabilities? searchAndReplace;
+
+  ClientNesCapabilities({
+    this.meta,
+    this.jump,
+    this.rename,
+    this.searchAndReplace,
+  });
+
+  factory ClientNesCapabilities.fromJson(Map<String, dynamic> json) =>
+      _$ClientNesCapabilitiesFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ClientNesCapabilitiesToJson(this);
+}
+
+/// Request parameters for `nes/start`.
+@JsonSerializable()
+class StartNesRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String? workspaceUri;
+  final List<WorkspaceFolder>? workspaceFolders;
+  final NesRepository? repository;
+
+  StartNesRequest({
+    this.meta,
+    this.workspaceUri,
+    this.workspaceFolders,
+    this.repository,
+  });
+
+  factory StartNesRequest.fromJson(Map<String, dynamic> json) =>
+      _$StartNesRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$StartNesRequestToJson(this);
+}
+
+/// Response to `nes/start`.
+///
+/// The returned session id addresses this NES session and is distinct from a
+/// prompt session id.
+@JsonSerializable()
+class StartNesResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+
+  StartNesResponse({this.meta, required this.sessionId});
+
+  factory StartNesResponse.fromJson(Map<String, dynamic> json) =>
+      _$StartNesResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$StartNesResponseToJson(this);
+}
+
+/// Request parameters for `nes/suggest`.
+@JsonSerializable()
+class SuggestNesRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final String uri;
+  final int version;
+
+  /// Where the cursor is.
+  final Position position;
+
+  /// The current selection, when there is one.
+  final Range? selection;
+  final NesTriggerKind triggerKind;
+  final NesSuggestContext? context;
+
+  SuggestNesRequest({
+    this.meta,
+    required this.sessionId,
+    required this.uri,
+    required this.version,
+    required this.position,
+    this.selection,
+    required this.triggerKind,
+    this.context,
+  });
+
+  factory SuggestNesRequest.fromJson(Map<String, dynamic> json) =>
+      _$SuggestNesRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SuggestNesRequestToJson(this);
+}
+
+/// Response to `nes/suggest`.
+@JsonSerializable()
+class SuggestNesResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  @NesSuggestionListConverter()
+  final List<NesSuggestion> suggestions;
+
+  SuggestNesResponse({this.meta, required this.suggestions});
+
+  factory SuggestNesResponse.fromJson(Map<String, dynamic> json) =>
+      _$SuggestNesResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$SuggestNesResponseToJson(this);
+}
+
+/// Notification parameters for `nes/accept`.
+@JsonSerializable()
+class AcceptNesNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final NesSuggestionId id;
+
+  AcceptNesNotification({
+    this.meta,
+    required this.sessionId,
+    required this.id,
+  });
+
+  factory AcceptNesNotification.fromJson(Map<String, dynamic> json) =>
+      _$AcceptNesNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AcceptNesNotificationToJson(this);
+}
+
+/// Notification parameters for `nes/reject`.
+@JsonSerializable()
+class RejectNesNotification {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+  final NesSuggestionId id;
+  final NesRejectReason? reason;
+
+  RejectNesNotification({
+    this.meta,
+    required this.sessionId,
+    required this.id,
+    this.reason,
+  });
+
+  factory RejectNesNotification.fromJson(Map<String, dynamic> json) =>
+      _$RejectNesNotificationFromJson(json);
+
+  Map<String, dynamic> toJson() => _$RejectNesNotificationToJson(this);
+}
+
+/// Request parameters for `nes/close`.
+@JsonSerializable()
+class CloseNesRequest {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+  final String sessionId;
+
+  CloseNesRequest({this.meta, required this.sessionId});
+
+  factory CloseNesRequest.fromJson(Map<String, dynamic> json) =>
+      _$CloseNesRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CloseNesRequestToJson(this);
+}
+
+/// Response to `nes/close`.
+@JsonSerializable()
+class CloseNesResponse {
+  @JsonKey(name: '_meta', includeIfNull: false)
+  final Map<String, dynamic>? meta;
+
+  CloseNesResponse({this.meta});
+
+  factory CloseNesResponse.fromJson(Map<String, dynamic> json) =>
+      _$CloseNesResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CloseNesResponseToJson(this);
+}
+
 /// Protocol method constants for agent-side requests
 const agentMethods = {
   'authenticate': 'authenticate',
   'initialize': 'initialize',
+  'logout': 'logout',
+  'providersList': 'providers/list',
+  'providersSet': 'providers/set',
+  'providersDisable': 'providers/disable',
+  'documentDidOpen': 'document/didOpen',
+  'documentDidChange': 'document/didChange',
+  'documentDidClose': 'document/didClose',
+  'documentDidSave': 'document/didSave',
+  'documentDidFocus': 'document/didFocus',
+  'mcpMessage': 'mcp/message',
+  'nesStart': 'nes/start',
+  'nesSuggest': 'nes/suggest',
+  'nesAccept': 'nes/accept',
+  'nesReject': 'nes/reject',
+  'nesClose': 'nes/close',
+  // Deprecated: `session/set_model` is not part of the ACP schema. Superseded
+  // by `session/set_config_option` with a model config category. Retained so
+  // existing integrations keep dispatching; removed in the next major release.
   'modelSelect': 'session/set_model',
+  'sessionClose': 'session/close',
+  'sessionDelete': 'session/delete',
   'sessionFork': 'session/fork',
   'sessionList': 'session/list',
   'sessionSetConfigOption': 'session/set_config_option',
@@ -2353,6 +4785,11 @@ const agentMethods = {
 
 /// Protocol method constants for client-side requests
 const clientMethods = {
+  'elicitationCreate': 'elicitation/create',
+  'mcpConnect': 'mcp/connect',
+  'mcpMessage': 'mcp/message',
+  'mcpDisconnect': 'mcp/disconnect',
+  'elicitationComplete': 'elicitation/complete',
   'fsReadTextFile': 'fs/read_text_file',
   'fsWriteTextFile': 'fs/write_text_file',
   'sessionRequestPermission': 'session/request_permission',

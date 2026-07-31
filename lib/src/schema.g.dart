@@ -51,6 +51,28 @@ ClientCapabilities _$ClientCapabilitiesFromJson(Map<String, dynamic> json) =>
           ? null
           : FileSystemCapability.fromJson(json['fs'] as Map<String, dynamic>),
       terminal: json['terminal'] as bool? ?? false,
+      elicitation: json['elicitation'] == null
+          ? null
+          : ElicitationCapabilities.fromJson(
+              json['elicitation'] as Map<String, dynamic>,
+            ),
+      session: json['session'] == null
+          ? null
+          : ClientSessionCapabilities.fromJson(
+              json['session'] as Map<String, dynamic>,
+            ),
+      plan: json['plan'] == null
+          ? null
+          : PlanCapabilities.fromJson(json['plan'] as Map<String, dynamic>),
+      auth: json['auth'] == null
+          ? null
+          : AuthCapabilities.fromJson(json['auth'] as Map<String, dynamic>),
+      nes: json['nes'] == null
+          ? null
+          : ClientNesCapabilities.fromJson(json['nes'] as Map<String, dynamic>),
+      positionEncodings: (json['positionEncodings'] as List<dynamic>?)
+          ?.map((e) => $enumDecode(_$PositionEncodingKindEnumMap, e))
+          .toList(),
     );
 
 Map<String, dynamic> _$ClientCapabilitiesToJson(ClientCapabilities instance) =>
@@ -58,7 +80,21 @@ Map<String, dynamic> _$ClientCapabilitiesToJson(ClientCapabilities instance) =>
       '_meta': ?instance.meta,
       'fs': instance.fs,
       'terminal': instance.terminal,
+      'session': instance.session,
+      'plan': instance.plan,
+      'auth': instance.auth,
+      'nes': instance.nes,
+      'positionEncodings': instance.positionEncodings
+          ?.map((e) => _$PositionEncodingKindEnumMap[e]!)
+          .toList(),
+      'elicitation': instance.elicitation,
     };
+
+const _$PositionEncodingKindEnumMap = {
+  PositionEncodingKind.utf8: 'utf-8',
+  PositionEncodingKind.utf16: 'utf-16',
+  PositionEncodingKind.utf32: 'utf-32',
+};
 
 FileSystemCapability _$FileSystemCapabilityFromJson(
   Map<String, dynamic> json,
@@ -299,7 +335,8 @@ SetSessionConfigOptionRequest _$SetSessionConfigOptionRequestFromJson(
   meta: json['_meta'] as Map<String, dynamic>?,
   sessionId: json['sessionId'] as String,
   configId: json['configId'] as String,
-  value: json['value'] as String,
+  value: json['value'] as Object,
+  type: json['type'] as String?,
 );
 
 Map<String, dynamic> _$SetSessionConfigOptionRequestToJson(
@@ -309,6 +346,7 @@ Map<String, dynamic> _$SetSessionConfigOptionRequestToJson(
   'sessionId': instance.sessionId,
   'configId': instance.configId,
   'value': instance.value,
+  'type': ?instance.type,
 };
 
 PromptRequest _$PromptRequestFromJson(Map<String, dynamic> json) =>
@@ -765,16 +803,38 @@ AgentCapabilities _$AgentCapabilitiesFromJson(Map<String, dynamic> json) =>
               json['sessionCapabilities'] as Map<String, dynamic>,
             ),
       loadSession: json['loadSession'] as bool? ?? false,
+      auth: json['auth'] == null
+          ? null
+          : AgentAuthCapabilities.fromJson(
+              json['auth'] as Map<String, dynamic>,
+            ),
+      providers: json['providers'] == null
+          ? null
+          : ProvidersCapabilities.fromJson(
+              json['providers'] as Map<String, dynamic>,
+            ),
+      nes: json['nes'] == null
+          ? null
+          : NesCapabilities.fromJson(json['nes'] as Map<String, dynamic>),
+      positionEncoding: $enumDecodeNullable(
+        _$PositionEncodingKindEnumMap,
+        json['positionEncoding'],
+      ),
     );
 
-Map<String, dynamic> _$AgentCapabilitiesToJson(AgentCapabilities instance) =>
-    <String, dynamic>{
-      '_meta': ?instance.meta,
-      'mcpCapabilities': instance.mcpCapabilities,
-      'promptCapabilities': instance.promptCapabilities,
-      'sessionCapabilities': instance.sessionCapabilities,
-      'loadSession': instance.loadSession,
-    };
+Map<String, dynamic> _$AgentCapabilitiesToJson(
+  AgentCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'mcpCapabilities': instance.mcpCapabilities,
+  'promptCapabilities': instance.promptCapabilities,
+  'sessionCapabilities': instance.sessionCapabilities,
+  'loadSession': instance.loadSession,
+  'auth': instance.auth,
+  'providers': instance.providers,
+  'nes': instance.nes,
+  'positionEncoding': _$PositionEncodingKindEnumMap[instance.positionEncoding],
+};
 
 SessionCapabilities _$SessionCapabilitiesFromJson(
   Map<String, dynamic> json,
@@ -791,6 +851,21 @@ SessionCapabilities _$SessionCapabilitiesFromJson(
       : SessionResumeCapabilities.fromJson(
           json['resume'] as Map<String, dynamic>,
         ),
+  delete: json['delete'] == null
+      ? null
+      : SessionDeleteCapabilities.fromJson(
+          json['delete'] as Map<String, dynamic>,
+        ),
+  close: json['close'] == null
+      ? null
+      : SessionCloseCapabilities.fromJson(
+          json['close'] as Map<String, dynamic>,
+        ),
+  additionalDirectories: json['additionalDirectories'] == null
+      ? null
+      : SessionAdditionalDirectoriesCapabilities.fromJson(
+          json['additionalDirectories'] as Map<String, dynamic>,
+        ),
 );
 
 Map<String, dynamic> _$SessionCapabilitiesToJson(
@@ -800,6 +875,9 @@ Map<String, dynamic> _$SessionCapabilitiesToJson(
   'fork': instance.fork,
   'list': instance.list,
   'resume': instance.resume,
+  'delete': instance.delete,
+  'close': instance.close,
+  'additionalDirectories': instance.additionalDirectories,
 };
 
 SessionForkCapabilities _$SessionForkCapabilitiesFromJson(
@@ -879,13 +957,68 @@ Map<String, dynamic> _$AuthenticateResponseToJson(
   AuthenticateResponse instance,
 ) => <String, dynamic>{'_meta': ?instance.meta};
 
+LogoutRequest _$LogoutRequestFromJson(Map<String, dynamic> json) =>
+    LogoutRequest(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$LogoutRequestToJson(LogoutRequest instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
+
+LogoutResponse _$LogoutResponseFromJson(Map<String, dynamic> json) =>
+    LogoutResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$LogoutResponseToJson(LogoutResponse instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
+
+DeleteSessionRequest _$DeleteSessionRequestFromJson(
+  Map<String, dynamic> json,
+) => DeleteSessionRequest(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+);
+
+Map<String, dynamic> _$DeleteSessionRequestToJson(
+  DeleteSessionRequest instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+};
+
+DeleteSessionResponse _$DeleteSessionResponseFromJson(
+  Map<String, dynamic> json,
+) => DeleteSessionResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$DeleteSessionResponseToJson(
+  DeleteSessionResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+CloseSessionRequest _$CloseSessionRequestFromJson(Map<String, dynamic> json) =>
+    CloseSessionRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      sessionId: json['sessionId'] as String,
+    );
+
+Map<String, dynamic> _$CloseSessionRequestToJson(
+  CloseSessionRequest instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+};
+
+CloseSessionResponse _$CloseSessionResponseFromJson(
+  Map<String, dynamic> json,
+) => CloseSessionResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$CloseSessionResponseToJson(
+  CloseSessionResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
 NewSessionResponse _$NewSessionResponseFromJson(Map<String, dynamic> json) =>
     NewSessionResponse(
       meta: json['_meta'] as Map<String, dynamic>?,
       sessionId: json['sessionId'] as String,
-      configOptions: (json['configOptions'] as List<dynamic>?)
-          ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List?,
+      ),
       modes: json['modes'] == null
           ? null
           : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -898,7 +1031,9 @@ Map<String, dynamic> _$NewSessionResponseToJson(NewSessionResponse instance) =>
     <String, dynamic>{
       '_meta': ?instance.meta,
       'sessionId': instance.sessionId,
-      'configOptions': ?instance.configOptions,
+      'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+        instance.configOptions,
+      ),
       'modes': instance.modes,
       'models': instance.models,
     };
@@ -950,34 +1085,65 @@ Map<String, dynamic> _$SessionModelStateToJson(SessionModelState instance) =>
       'currentModelId': instance.currentModelId,
     };
 
-SessionConfigOption _$SessionConfigOptionFromJson(Map<String, dynamic> json) =>
-    SessionConfigOption(
-      meta: json['_meta'] as Map<String, dynamic>?,
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      category: json['category'] as String?,
-      type: json['type'] as String? ?? 'select',
-      currentValue: json['currentValue'] as String,
-      options: const SessionConfigSelectOptionsConverter().fromJson(
-        json['options'] as List,
-      ),
-    );
+SelectSessionConfigOption _$SelectSessionConfigOptionFromJson(
+  Map<String, dynamic> json,
+) => SelectSessionConfigOption(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  id: json['id'] as String,
+  name: json['name'] as String,
+  description: json['description'] as String?,
+  category: json['category'] as String?,
+  currentValue: json['currentValue'] as String,
+  options: const SessionConfigSelectOptionsConverter().fromJson(
+    json['options'] as List,
+  ),
+);
 
-Map<String, dynamic> _$SessionConfigOptionToJson(
-  SessionConfigOption instance,
+Map<String, dynamic> _$SelectSessionConfigOptionToJson(
+  SelectSessionConfigOption instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
   'id': instance.id,
   'name': instance.name,
   'description': instance.description,
   'category': instance.category,
-  'type': instance.type,
   'currentValue': instance.currentValue,
   'options': const SessionConfigSelectOptionsConverter().toJson(
     instance.options,
   ),
 };
+
+BooleanSessionConfigOption _$BooleanSessionConfigOptionFromJson(
+  Map<String, dynamic> json,
+) => BooleanSessionConfigOption(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  id: json['id'] as String,
+  name: json['name'] as String,
+  description: json['description'] as String?,
+  category: json['category'] as String?,
+  currentValue: json['currentValue'] as bool,
+);
+
+Map<String, dynamic> _$BooleanSessionConfigOptionToJson(
+  BooleanSessionConfigOption instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'id': instance.id,
+  'name': instance.name,
+  'description': instance.description,
+  'category': instance.category,
+  'currentValue': instance.currentValue,
+};
+
+UnknownSessionConfigOption _$UnknownSessionConfigOptionFromJson(
+  Map<String, dynamic> json,
+) => UnknownSessionConfigOption(
+  rawJson: json['rawJson'] as Map<String, dynamic>,
+);
+
+Map<String, dynamic> _$UnknownSessionConfigOptionToJson(
+  UnknownSessionConfigOption instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
 
 UngroupedSessionConfigSelectOptions
 _$UngroupedSessionConfigSelectOptionsFromJson(Map<String, dynamic> json) =>
@@ -1078,9 +1244,9 @@ Map<String, dynamic> _$SessionInfoToJson(SessionInfo instance) =>
 LoadSessionResponse _$LoadSessionResponseFromJson(Map<String, dynamic> json) =>
     LoadSessionResponse(
       meta: json['_meta'] as Map<String, dynamic>?,
-      configOptions: (json['configOptions'] as List<dynamic>?)
-          ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List?,
+      ),
       modes: json['modes'] == null
           ? null
           : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1093,7 +1259,9 @@ Map<String, dynamic> _$LoadSessionResponseToJson(
   LoadSessionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': ?instance.configOptions,
+  'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
   'modes': instance.modes,
   'models': instance.models,
 };
@@ -1119,9 +1287,9 @@ Map<String, dynamic> _$ListSessionsResponseToJson(
 ForkSessionResponse _$ForkSessionResponseFromJson(Map<String, dynamic> json) =>
     ForkSessionResponse(
       meta: json['_meta'] as Map<String, dynamic>?,
-      configOptions: (json['configOptions'] as List<dynamic>?)
-          ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List?,
+      ),
       modes: json['modes'] == null
           ? null
           : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1135,7 +1303,9 @@ Map<String, dynamic> _$ForkSessionResponseToJson(
   ForkSessionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': ?instance.configOptions,
+  'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
   'modes': instance.modes,
   'models': instance.models,
   'sessionId': instance.sessionId,
@@ -1145,9 +1315,9 @@ ResumeSessionResponse _$ResumeSessionResponseFromJson(
   Map<String, dynamic> json,
 ) => ResumeSessionResponse(
   meta: json['_meta'] as Map<String, dynamic>?,
-  configOptions: (json['configOptions'] as List<dynamic>?)
-      ?.map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-      .toList(),
+  configOptions: const NullableSessionConfigOptionListConverter().fromJson(
+    json['configOptions'] as List?,
+  ),
   modes: json['modes'] == null
       ? null
       : SessionModeState.fromJson(json['modes'] as Map<String, dynamic>),
@@ -1160,7 +1330,9 @@ Map<String, dynamic> _$ResumeSessionResponseToJson(
   ResumeSessionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': ?instance.configOptions,
+  'configOptions': ?const NullableSessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
   'modes': instance.modes,
   'models': instance.models,
 };
@@ -1177,16 +1349,18 @@ SetSessionConfigOptionResponse _$SetSessionConfigOptionResponseFromJson(
   Map<String, dynamic> json,
 ) => SetSessionConfigOptionResponse(
   meta: json['_meta'] as Map<String, dynamic>?,
-  configOptions: (json['configOptions'] as List<dynamic>)
-      .map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-      .toList(),
+  configOptions: const SessionConfigOptionListConverter().fromJson(
+    json['configOptions'] as List,
+  ),
 );
 
 Map<String, dynamic> _$SetSessionConfigOptionResponseToJson(
   SetSessionConfigOptionResponse instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
-  'configOptions': instance.configOptions,
+  'configOptions': const SessionConfigOptionListConverter().toJson(
+    instance.configOptions,
+  ),
 };
 
 Usage _$UsageFromJson(Map<String, dynamic> json) => Usage(
@@ -1510,12 +1684,14 @@ ContentToolCallContent _$ContentToolCallContentFromJson(
   content: const ContentBlockConverter().fromJson(
     json['content'] as Map<String, dynamic>,
   ),
+  type: json['type'] as String? ?? 'content',
 );
 
 Map<String, dynamic> _$ContentToolCallContentToJson(
   ContentToolCallContent instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
+  'type': instance.type,
   'content': const ContentBlockConverter().toJson(instance.content),
 };
 
@@ -1525,12 +1701,14 @@ DiffToolCallContent _$DiffToolCallContentFromJson(Map<String, dynamic> json) =>
       newText: json['newText'] as String,
       oldText: json['oldText'] as String?,
       path: json['path'] as String,
+      type: json['type'] as String? ?? 'diff',
     );
 
 Map<String, dynamic> _$DiffToolCallContentToJson(
   DiffToolCallContent instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
+  'type': instance.type,
   'newText': instance.newText,
   'oldText': instance.oldText,
   'path': instance.path,
@@ -1541,12 +1719,14 @@ TerminalToolCallContent _$TerminalToolCallContentFromJson(
 ) => TerminalToolCallContent(
   meta: json['_meta'] as Map<String, dynamic>?,
   terminalId: json['terminalId'] as String,
+  type: json['type'] as String? ?? 'terminal',
 );
 
 Map<String, dynamic> _$TerminalToolCallContentToJson(
   TerminalToolCallContent instance,
 ) => <String, dynamic>{
   '_meta': ?instance.meta,
+  'type': instance.type,
   'terminalId': instance.terminalId,
 };
 
@@ -1812,15 +1992,17 @@ Map<String, dynamic> _$CurrentModeUpdateSessionUpdateToJson(
 ConfigOptionUpdate _$ConfigOptionUpdateFromJson(Map<String, dynamic> json) =>
     ConfigOptionUpdate(
       meta: json['_meta'] as Map<String, dynamic>?,
-      configOptions: (json['configOptions'] as List<dynamic>)
-          .map((e) => SessionConfigOption.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      configOptions: const SessionConfigOptionListConverter().fromJson(
+        json['configOptions'] as List,
+      ),
     );
 
 Map<String, dynamic> _$ConfigOptionUpdateToJson(ConfigOptionUpdate instance) =>
     <String, dynamic>{
       '_meta': ?instance.meta,
-      'configOptions': instance.configOptions,
+      'configOptions': const SessionConfigOptionListConverter().toJson(
+        instance.configOptions,
+      ),
     };
 
 SessionInfoUpdate _$SessionInfoUpdateFromJson(Map<String, dynamic> json) =>
@@ -1861,3 +2043,1518 @@ UnknownSessionUpdate _$UnknownSessionUpdateFromJson(
 Map<String, dynamic> _$UnknownSessionUpdateToJson(
   UnknownSessionUpdate instance,
 ) => <String, dynamic>{'rawJson': instance.rawJson};
+
+EnumOption _$EnumOptionFromJson(Map<String, dynamic> json) => EnumOption(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  constValue: json['const'] as String,
+  title: json['title'] as String,
+  description: json['description'] as String?,
+);
+
+Map<String, dynamic> _$EnumOptionToJson(EnumOption instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'const': instance.constValue,
+      'title': instance.title,
+      'description': instance.description,
+    };
+
+StringMultiSelectItems _$StringMultiSelectItemsFromJson(
+  Map<String, dynamic> json,
+) => StringMultiSelectItems(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  enumValues: (json['enum'] as List<dynamic>).map((e) => e as String).toList(),
+);
+
+Map<String, dynamic> _$StringMultiSelectItemsToJson(
+  StringMultiSelectItems instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'enum': instance.enumValues};
+
+TitledMultiSelectItems _$TitledMultiSelectItemsFromJson(
+  Map<String, dynamic> json,
+) => TitledMultiSelectItems(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  anyOf: (json['anyOf'] as List<dynamic>)
+      .map((e) => EnumOption.fromJson(e as Map<String, dynamic>))
+      .toList(),
+);
+
+Map<String, dynamic> _$TitledMultiSelectItemsToJson(
+  TitledMultiSelectItems instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'anyOf': instance.anyOf};
+
+UnknownMultiSelectItems _$UnknownMultiSelectItemsFromJson(
+  Map<String, dynamic> json,
+) => UnknownMultiSelectItems(rawJson: json['rawJson'] as Map<String, dynamic>);
+
+Map<String, dynamic> _$UnknownMultiSelectItemsToJson(
+  UnknownMultiSelectItems instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
+
+StringPropertySchema _$StringPropertySchemaFromJson(
+  Map<String, dynamic> json,
+) => StringPropertySchema(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  title: json['title'] as String?,
+  description: json['description'] as String?,
+  minLength: (json['minLength'] as num?)?.toInt(),
+  maxLength: (json['maxLength'] as num?)?.toInt(),
+  pattern: json['pattern'] as String?,
+  format: $enumDecodeNullable(_$StringFormatEnumMap, json['format']),
+  defaultValue: json['default'] as String?,
+  enumValues: (json['enum'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
+  oneOf: (json['oneOf'] as List<dynamic>?)
+      ?.map((e) => EnumOption.fromJson(e as Map<String, dynamic>))
+      .toList(),
+);
+
+Map<String, dynamic> _$StringPropertySchemaToJson(
+  StringPropertySchema instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'title': instance.title,
+  'description': instance.description,
+  'minLength': instance.minLength,
+  'maxLength': instance.maxLength,
+  'pattern': instance.pattern,
+  'format': _$StringFormatEnumMap[instance.format],
+  'default': instance.defaultValue,
+  'enum': instance.enumValues,
+  'oneOf': instance.oneOf,
+};
+
+const _$StringFormatEnumMap = {
+  StringFormat.email: 'email',
+  StringFormat.uri: 'uri',
+  StringFormat.date: 'date',
+  StringFormat.dateTime: 'date-time',
+};
+
+NumberPropertySchema _$NumberPropertySchemaFromJson(
+  Map<String, dynamic> json,
+) => NumberPropertySchema(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  title: json['title'] as String?,
+  description: json['description'] as String?,
+  minimum: json['minimum'] as num?,
+  maximum: json['maximum'] as num?,
+  defaultValue: json['default'] as num?,
+);
+
+Map<String, dynamic> _$NumberPropertySchemaToJson(
+  NumberPropertySchema instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'title': instance.title,
+  'description': instance.description,
+  'minimum': instance.minimum,
+  'maximum': instance.maximum,
+  'default': instance.defaultValue,
+};
+
+IntegerPropertySchema _$IntegerPropertySchemaFromJson(
+  Map<String, dynamic> json,
+) => IntegerPropertySchema(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  title: json['title'] as String?,
+  description: json['description'] as String?,
+  minimum: (json['minimum'] as num?)?.toInt(),
+  maximum: (json['maximum'] as num?)?.toInt(),
+  defaultValue: (json['default'] as num?)?.toInt(),
+);
+
+Map<String, dynamic> _$IntegerPropertySchemaToJson(
+  IntegerPropertySchema instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'title': instance.title,
+  'description': instance.description,
+  'minimum': instance.minimum,
+  'maximum': instance.maximum,
+  'default': instance.defaultValue,
+};
+
+BooleanPropertySchema _$BooleanPropertySchemaFromJson(
+  Map<String, dynamic> json,
+) => BooleanPropertySchema(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  title: json['title'] as String?,
+  description: json['description'] as String?,
+  defaultValue: json['default'] as bool?,
+);
+
+Map<String, dynamic> _$BooleanPropertySchemaToJson(
+  BooleanPropertySchema instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'title': instance.title,
+  'description': instance.description,
+  'default': instance.defaultValue,
+};
+
+MultiSelectPropertySchema _$MultiSelectPropertySchemaFromJson(
+  Map<String, dynamic> json,
+) => MultiSelectPropertySchema(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  title: json['title'] as String?,
+  description: json['description'] as String?,
+  minItems: (json['minItems'] as num?)?.toInt(),
+  maxItems: (json['maxItems'] as num?)?.toInt(),
+  items: const MultiSelectItemsConverter().fromJson(
+    json['items'] as Map<String, dynamic>,
+  ),
+  defaultValue: (json['default'] as List<dynamic>?)
+      ?.map((e) => e as String)
+      .toList(),
+);
+
+Map<String, dynamic> _$MultiSelectPropertySchemaToJson(
+  MultiSelectPropertySchema instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'title': instance.title,
+  'description': instance.description,
+  'minItems': instance.minItems,
+  'maxItems': instance.maxItems,
+  'items': const MultiSelectItemsConverter().toJson(instance.items),
+  'default': instance.defaultValue,
+};
+
+UnknownPropertySchema _$UnknownPropertySchemaFromJson(
+  Map<String, dynamic> json,
+) => UnknownPropertySchema(rawJson: json['rawJson'] as Map<String, dynamic>);
+
+Map<String, dynamic> _$UnknownPropertySchemaToJson(
+  UnknownPropertySchema instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
+
+ElicitationSchema _$ElicitationSchemaFromJson(Map<String, dynamic> json) =>
+    ElicitationSchema(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      type: json['type'] as String? ?? 'object',
+      title: json['title'] as String?,
+      description: json['description'] as String?,
+      properties: const ElicitationPropertySchemaMapConverter().fromJson(
+        json['properties'] as Map<String, dynamic>?,
+      ),
+      required: (json['required'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList(),
+    );
+
+Map<String, dynamic> _$ElicitationSchemaToJson(ElicitationSchema instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'type': instance.type,
+      'title': instance.title,
+      'description': instance.description,
+      'properties': const ElicitationPropertySchemaMapConverter().toJson(
+        instance.properties,
+      ),
+      'required': instance.required,
+    };
+
+ElicitationFormRequest _$ElicitationFormRequestFromJson(
+  Map<String, dynamic> json,
+) => ElicitationFormRequest(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  message: json['message'] as String,
+  sessionId: json['sessionId'] as String?,
+  toolCallId: json['toolCallId'] as String?,
+  requestId: json['requestId'],
+  requestedSchema: ElicitationSchema.fromJson(
+    json['requestedSchema'] as Map<String, dynamic>,
+  ),
+);
+
+Map<String, dynamic> _$ElicitationFormRequestToJson(
+  ElicitationFormRequest instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'message': instance.message,
+  'sessionId': instance.sessionId,
+  'toolCallId': instance.toolCallId,
+  'requestId': instance.requestId,
+  'requestedSchema': instance.requestedSchema,
+};
+
+ElicitationUrlRequest _$ElicitationUrlRequestFromJson(
+  Map<String, dynamic> json,
+) => ElicitationUrlRequest(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  message: json['message'] as String,
+  sessionId: json['sessionId'] as String?,
+  toolCallId: json['toolCallId'] as String?,
+  requestId: json['requestId'],
+  elicitationId: json['elicitationId'] as String,
+  url: json['url'] as String,
+);
+
+Map<String, dynamic> _$ElicitationUrlRequestToJson(
+  ElicitationUrlRequest instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'message': instance.message,
+  'sessionId': instance.sessionId,
+  'toolCallId': instance.toolCallId,
+  'requestId': instance.requestId,
+  'elicitationId': instance.elicitationId,
+  'url': instance.url,
+};
+
+UnknownElicitationRequest _$UnknownElicitationRequestFromJson(
+  Map<String, dynamic> json,
+) =>
+    UnknownElicitationRequest(rawJson: json['rawJson'] as Map<String, dynamic>);
+
+Map<String, dynamic> _$UnknownElicitationRequestToJson(
+  UnknownElicitationRequest instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
+
+ElicitationAcceptResponse _$ElicitationAcceptResponseFromJson(
+  Map<String, dynamic> json,
+) => ElicitationAcceptResponse(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  content: json['content'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$ElicitationAcceptResponseToJson(
+  ElicitationAcceptResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'content': instance.content};
+
+ElicitationDeclineResponse _$ElicitationDeclineResponseFromJson(
+  Map<String, dynamic> json,
+) => ElicitationDeclineResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$ElicitationDeclineResponseToJson(
+  ElicitationDeclineResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+ElicitationCancelResponse _$ElicitationCancelResponseFromJson(
+  Map<String, dynamic> json,
+) => ElicitationCancelResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$ElicitationCancelResponseToJson(
+  ElicitationCancelResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+UnknownElicitationResponse _$UnknownElicitationResponseFromJson(
+  Map<String, dynamic> json,
+) => UnknownElicitationResponse(
+  rawJson: json['rawJson'] as Map<String, dynamic>,
+);
+
+Map<String, dynamic> _$UnknownElicitationResponseToJson(
+  UnknownElicitationResponse instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
+
+CompleteElicitationNotification _$CompleteElicitationNotificationFromJson(
+  Map<String, dynamic> json,
+) => CompleteElicitationNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  elicitationId: json['elicitationId'] as String,
+);
+
+Map<String, dynamic> _$CompleteElicitationNotificationToJson(
+  CompleteElicitationNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'elicitationId': instance.elicitationId,
+};
+
+ElicitationFormCapabilities _$ElicitationFormCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ElicitationFormCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$ElicitationFormCapabilitiesToJson(
+  ElicitationFormCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+ElicitationUrlCapabilities _$ElicitationUrlCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ElicitationUrlCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$ElicitationUrlCapabilitiesToJson(
+  ElicitationUrlCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+ElicitationCapabilities _$ElicitationCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ElicitationCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  form: json['form'] == null
+      ? null
+      : ElicitationFormCapabilities.fromJson(
+          json['form'] as Map<String, dynamic>,
+        ),
+  url: json['url'] == null
+      ? null
+      : ElicitationUrlCapabilities.fromJson(
+          json['url'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$ElicitationCapabilitiesToJson(
+  ElicitationCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'form': instance.form,
+  'url': instance.url,
+};
+
+LogoutCapabilities _$LogoutCapabilitiesFromJson(Map<String, dynamic> json) =>
+    LogoutCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$LogoutCapabilitiesToJson(LogoutCapabilities instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
+
+SessionCloseCapabilities _$SessionCloseCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => SessionCloseCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$SessionCloseCapabilitiesToJson(
+  SessionCloseCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+SessionDeleteCapabilities _$SessionDeleteCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => SessionDeleteCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$SessionDeleteCapabilitiesToJson(
+  SessionDeleteCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+SessionAdditionalDirectoriesCapabilities
+_$SessionAdditionalDirectoriesCapabilitiesFromJson(Map<String, dynamic> json) =>
+    SessionAdditionalDirectoriesCapabilities(
+      meta: json['_meta'] as Map<String, dynamic>?,
+    );
+
+Map<String, dynamic> _$SessionAdditionalDirectoriesCapabilitiesToJson(
+  SessionAdditionalDirectoriesCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+BooleanConfigOptionCapabilities _$BooleanConfigOptionCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => BooleanConfigOptionCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$BooleanConfigOptionCapabilitiesToJson(
+  BooleanConfigOptionCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+PlanCapabilities _$PlanCapabilitiesFromJson(Map<String, dynamic> json) =>
+    PlanCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$PlanCapabilitiesToJson(PlanCapabilities instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
+
+AgentAuthCapabilities _$AgentAuthCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => AgentAuthCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  logout: json['logout'] == null
+      ? null
+      : LogoutCapabilities.fromJson(json['logout'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$AgentAuthCapabilitiesToJson(
+  AgentAuthCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'logout': instance.logout};
+
+AuthCapabilities _$AuthCapabilitiesFromJson(Map<String, dynamic> json) =>
+    AuthCapabilities(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      terminal: json['terminal'] as bool? ?? false,
+    );
+
+Map<String, dynamic> _$AuthCapabilitiesToJson(AuthCapabilities instance) =>
+    <String, dynamic>{'_meta': ?instance.meta, 'terminal': instance.terminal};
+
+SessionConfigOptionsCapabilities _$SessionConfigOptionsCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => SessionConfigOptionsCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  boolean: json['boolean'] == null
+      ? null
+      : BooleanConfigOptionCapabilities.fromJson(
+          json['boolean'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$SessionConfigOptionsCapabilitiesToJson(
+  SessionConfigOptionsCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'boolean': instance.boolean};
+
+ClientSessionCapabilities _$ClientSessionCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ClientSessionCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  configOptions: json['configOptions'] == null
+      ? null
+      : SessionConfigOptionsCapabilities.fromJson(
+          json['configOptions'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$ClientSessionCapabilitiesToJson(
+  ClientSessionCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'configOptions': instance.configOptions,
+};
+
+ProviderCurrentConfig _$ProviderCurrentConfigFromJson(
+  Map<String, dynamic> json,
+) => ProviderCurrentConfig(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  apiType: json['apiType'] as String,
+  baseUrl: json['baseUrl'] as String,
+);
+
+Map<String, dynamic> _$ProviderCurrentConfigToJson(
+  ProviderCurrentConfig instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'apiType': instance.apiType,
+  'baseUrl': instance.baseUrl,
+};
+
+ProviderInfo _$ProviderInfoFromJson(Map<String, dynamic> json) => ProviderInfo(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  providerId: json['providerId'] as String,
+  supported: (json['supported'] as List<dynamic>)
+      .map((e) => e as String)
+      .toList(),
+  required: json['required'] as bool,
+  current: json['current'] == null
+      ? null
+      : ProviderCurrentConfig.fromJson(json['current'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$ProviderInfoToJson(ProviderInfo instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'providerId': instance.providerId,
+      'supported': instance.supported,
+      'required': instance.required,
+      'current': instance.current,
+    };
+
+ProvidersCapabilities _$ProvidersCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ProvidersCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$ProvidersCapabilitiesToJson(
+  ProvidersCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+ListProvidersRequest _$ListProvidersRequestFromJson(
+  Map<String, dynamic> json,
+) => ListProvidersRequest(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$ListProvidersRequestToJson(
+  ListProvidersRequest instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+ListProvidersResponse _$ListProvidersResponseFromJson(
+  Map<String, dynamic> json,
+) => ListProvidersResponse(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  providers: (json['providers'] as List<dynamic>)
+      .map((e) => ProviderInfo.fromJson(e as Map<String, dynamic>))
+      .toList(),
+);
+
+Map<String, dynamic> _$ListProvidersResponseToJson(
+  ListProvidersResponse instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'providers': instance.providers,
+};
+
+SetProviderRequest _$SetProviderRequestFromJson(Map<String, dynamic> json) =>
+    SetProviderRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      providerId: json['providerId'] as String,
+      apiType: json['apiType'] as String,
+      baseUrl: json['baseUrl'] as String,
+      headers: (json['headers'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ),
+    );
+
+Map<String, dynamic> _$SetProviderRequestToJson(SetProviderRequest instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'providerId': instance.providerId,
+      'apiType': instance.apiType,
+      'baseUrl': instance.baseUrl,
+      'headers': ?instance.headers,
+    };
+
+SetProviderResponse _$SetProviderResponseFromJson(Map<String, dynamic> json) =>
+    SetProviderResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$SetProviderResponseToJson(
+  SetProviderResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+DisableProviderRequest _$DisableProviderRequestFromJson(
+  Map<String, dynamic> json,
+) => DisableProviderRequest(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  providerId: json['providerId'] as String,
+);
+
+Map<String, dynamic> _$DisableProviderRequestToJson(
+  DisableProviderRequest instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'providerId': instance.providerId,
+};
+
+DisableProviderResponse _$DisableProviderResponseFromJson(
+  Map<String, dynamic> json,
+) => DisableProviderResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$DisableProviderResponseToJson(
+  DisableProviderResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+Position _$PositionFromJson(Map<String, dynamic> json) => Position(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  line: (json['line'] as num).toInt(),
+  character: (json['character'] as num).toInt(),
+);
+
+Map<String, dynamic> _$PositionToJson(Position instance) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'line': instance.line,
+  'character': instance.character,
+};
+
+Range _$RangeFromJson(Map<String, dynamic> json) => Range(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  start: Position.fromJson(json['start'] as Map<String, dynamic>),
+  end: Position.fromJson(json['end'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$RangeToJson(Range instance) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'start': instance.start,
+  'end': instance.end,
+};
+
+TextDocumentContentChangeEvent _$TextDocumentContentChangeEventFromJson(
+  Map<String, dynamic> json,
+) => TextDocumentContentChangeEvent(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  range: json['range'] == null
+      ? null
+      : Range.fromJson(json['range'] as Map<String, dynamic>),
+  text: json['text'] as String,
+);
+
+Map<String, dynamic> _$TextDocumentContentChangeEventToJson(
+  TextDocumentContentChangeEvent instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'range': instance.range,
+  'text': instance.text,
+};
+
+DidOpenDocumentNotification _$DidOpenDocumentNotificationFromJson(
+  Map<String, dynamic> json,
+) => DidOpenDocumentNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  uri: json['uri'] as String,
+  languageId: json['languageId'] as String,
+  version: (json['version'] as num).toInt(),
+  text: json['text'] as String,
+);
+
+Map<String, dynamic> _$DidOpenDocumentNotificationToJson(
+  DidOpenDocumentNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'uri': instance.uri,
+  'languageId': instance.languageId,
+  'version': instance.version,
+  'text': instance.text,
+};
+
+DidChangeDocumentNotification _$DidChangeDocumentNotificationFromJson(
+  Map<String, dynamic> json,
+) => DidChangeDocumentNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  uri: json['uri'] as String,
+  version: (json['version'] as num).toInt(),
+  contentChanges: (json['contentChanges'] as List<dynamic>)
+      .map(
+        (e) =>
+            TextDocumentContentChangeEvent.fromJson(e as Map<String, dynamic>),
+      )
+      .toList(),
+);
+
+Map<String, dynamic> _$DidChangeDocumentNotificationToJson(
+  DidChangeDocumentNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'uri': instance.uri,
+  'version': instance.version,
+  'contentChanges': instance.contentChanges,
+};
+
+DidCloseDocumentNotification _$DidCloseDocumentNotificationFromJson(
+  Map<String, dynamic> json,
+) => DidCloseDocumentNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  uri: json['uri'] as String,
+);
+
+Map<String, dynamic> _$DidCloseDocumentNotificationToJson(
+  DidCloseDocumentNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'uri': instance.uri,
+};
+
+DidSaveDocumentNotification _$DidSaveDocumentNotificationFromJson(
+  Map<String, dynamic> json,
+) => DidSaveDocumentNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  uri: json['uri'] as String,
+);
+
+Map<String, dynamic> _$DidSaveDocumentNotificationToJson(
+  DidSaveDocumentNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'uri': instance.uri,
+};
+
+DidFocusDocumentNotification _$DidFocusDocumentNotificationFromJson(
+  Map<String, dynamic> json,
+) => DidFocusDocumentNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  uri: json['uri'] as String,
+  version: (json['version'] as num).toInt(),
+  position: Position.fromJson(json['position'] as Map<String, dynamic>),
+  visibleRange: Range.fromJson(json['visibleRange'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$DidFocusDocumentNotificationToJson(
+  DidFocusDocumentNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'uri': instance.uri,
+  'version': instance.version,
+  'position': instance.position,
+  'visibleRange': instance.visibleRange,
+};
+
+AcpMcpServer _$AcpMcpServerFromJson(Map<String, dynamic> json) => AcpMcpServer(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  name: json['name'] as String,
+  serverId: json['serverId'] as String,
+);
+
+Map<String, dynamic> _$AcpMcpServerToJson(AcpMcpServer instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'name': instance.name,
+      'serverId': instance.serverId,
+    };
+
+ConnectMcpRequest _$ConnectMcpRequestFromJson(Map<String, dynamic> json) =>
+    ConnectMcpRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      serverId: json['serverId'] as String,
+    );
+
+Map<String, dynamic> _$ConnectMcpRequestToJson(ConnectMcpRequest instance) =>
+    <String, dynamic>{'_meta': ?instance.meta, 'serverId': instance.serverId};
+
+ConnectMcpResponse _$ConnectMcpResponseFromJson(Map<String, dynamic> json) =>
+    ConnectMcpResponse(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      connectionId: json['connectionId'] as String,
+    );
+
+Map<String, dynamic> _$ConnectMcpResponseToJson(ConnectMcpResponse instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'connectionId': instance.connectionId,
+    };
+
+MessageMcpRequest _$MessageMcpRequestFromJson(Map<String, dynamic> json) =>
+    MessageMcpRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      connectionId: json['connectionId'] as String,
+      method: json['method'] as String,
+      params: json['params'] as Map<String, dynamic>?,
+    );
+
+Map<String, dynamic> _$MessageMcpRequestToJson(MessageMcpRequest instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'connectionId': instance.connectionId,
+      'method': instance.method,
+      'params': ?instance.params,
+    };
+
+MessageMcpNotification _$MessageMcpNotificationFromJson(
+  Map<String, dynamic> json,
+) => MessageMcpNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  connectionId: json['connectionId'] as String,
+  method: json['method'] as String,
+  params: json['params'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$MessageMcpNotificationToJson(
+  MessageMcpNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'connectionId': instance.connectionId,
+  'method': instance.method,
+  'params': ?instance.params,
+};
+
+DisconnectMcpRequest _$DisconnectMcpRequestFromJson(
+  Map<String, dynamic> json,
+) => DisconnectMcpRequest(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  connectionId: json['connectionId'] as String,
+);
+
+Map<String, dynamic> _$DisconnectMcpRequestToJson(
+  DisconnectMcpRequest instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'connectionId': instance.connectionId,
+};
+
+DisconnectMcpResponse _$DisconnectMcpResponseFromJson(
+  Map<String, dynamic> json,
+) => DisconnectMcpResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$DisconnectMcpResponseToJson(
+  DisconnectMcpResponse instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+WorkspaceFolder _$WorkspaceFolderFromJson(Map<String, dynamic> json) =>
+    WorkspaceFolder(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      uri: json['uri'] as String,
+      name: json['name'] as String,
+    );
+
+Map<String, dynamic> _$WorkspaceFolderToJson(WorkspaceFolder instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'uri': instance.uri,
+      'name': instance.name,
+    };
+
+NesRepository _$NesRepositoryFromJson(Map<String, dynamic> json) =>
+    NesRepository(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      name: json['name'] as String,
+      owner: json['owner'] as String,
+      remoteUrl: json['remoteUrl'] as String,
+    );
+
+Map<String, dynamic> _$NesRepositoryToJson(NesRepository instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'name': instance.name,
+      'owner': instance.owner,
+      'remoteUrl': instance.remoteUrl,
+    };
+
+NesExcerpt _$NesExcerptFromJson(Map<String, dynamic> json) => NesExcerpt(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  startLine: (json['startLine'] as num).toInt(),
+  endLine: (json['endLine'] as num).toInt(),
+  text: json['text'] as String,
+);
+
+Map<String, dynamic> _$NesExcerptToJson(NesExcerpt instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'startLine': instance.startLine,
+      'endLine': instance.endLine,
+      'text': instance.text,
+    };
+
+NesTextEdit _$NesTextEditFromJson(Map<String, dynamic> json) => NesTextEdit(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  range: Range.fromJson(json['range'] as Map<String, dynamic>),
+  newText: json['newText'] as String,
+);
+
+Map<String, dynamic> _$NesTextEditToJson(NesTextEdit instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'range': instance.range,
+      'newText': instance.newText,
+    };
+
+NesRecentFile _$NesRecentFileFromJson(Map<String, dynamic> json) =>
+    NesRecentFile(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      uri: json['uri'] as String,
+      languageId: json['languageId'] as String,
+      text: json['text'] as String,
+    );
+
+Map<String, dynamic> _$NesRecentFileToJson(NesRecentFile instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'uri': instance.uri,
+      'languageId': instance.languageId,
+      'text': instance.text,
+    };
+
+NesRelatedSnippet _$NesRelatedSnippetFromJson(Map<String, dynamic> json) =>
+    NesRelatedSnippet(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      uri: json['uri'] as String,
+      excerpts: (json['excerpts'] as List<dynamic>)
+          .map((e) => NesExcerpt.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$NesRelatedSnippetToJson(NesRelatedSnippet instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'uri': instance.uri,
+      'excerpts': instance.excerpts,
+    };
+
+NesEditHistoryEntry _$NesEditHistoryEntryFromJson(Map<String, dynamic> json) =>
+    NesEditHistoryEntry(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      uri: json['uri'] as String,
+      diff: json['diff'] as String,
+    );
+
+Map<String, dynamic> _$NesEditHistoryEntryToJson(
+  NesEditHistoryEntry instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'uri': instance.uri,
+  'diff': instance.diff,
+};
+
+NesUserAction _$NesUserActionFromJson(Map<String, dynamic> json) =>
+    NesUserAction(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      action: json['action'] as String,
+      uri: json['uri'] as String,
+      position: Position.fromJson(json['position'] as Map<String, dynamic>),
+      timestampMs: (json['timestampMs'] as num).toInt(),
+    );
+
+Map<String, dynamic> _$NesUserActionToJson(NesUserAction instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'action': instance.action,
+      'uri': instance.uri,
+      'position': instance.position,
+      'timestampMs': instance.timestampMs,
+    };
+
+NesOpenFile _$NesOpenFileFromJson(Map<String, dynamic> json) => NesOpenFile(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  uri: json['uri'] as String,
+  languageId: json['languageId'] as String,
+  visibleRange: json['visibleRange'] == null
+      ? null
+      : Range.fromJson(json['visibleRange'] as Map<String, dynamic>),
+  lastFocusedMs: (json['lastFocusedMs'] as num?)?.toInt(),
+);
+
+Map<String, dynamic> _$NesOpenFileToJson(NesOpenFile instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'uri': instance.uri,
+      'languageId': instance.languageId,
+      'visibleRange': instance.visibleRange,
+      'lastFocusedMs': instance.lastFocusedMs,
+    };
+
+NesDiagnostic _$NesDiagnosticFromJson(Map<String, dynamic> json) =>
+    NesDiagnostic(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      uri: json['uri'] as String,
+      range: Range.fromJson(json['range'] as Map<String, dynamic>),
+      severity: $enumDecode(_$NesDiagnosticSeverityEnumMap, json['severity']),
+      message: json['message'] as String,
+    );
+
+Map<String, dynamic> _$NesDiagnosticToJson(NesDiagnostic instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'uri': instance.uri,
+      'range': instance.range,
+      'severity': _$NesDiagnosticSeverityEnumMap[instance.severity]!,
+      'message': instance.message,
+    };
+
+const _$NesDiagnosticSeverityEnumMap = {
+  NesDiagnosticSeverity.error: 'error',
+  NesDiagnosticSeverity.warning: 'warning',
+  NesDiagnosticSeverity.information: 'information',
+  NesDiagnosticSeverity.hint: 'hint',
+};
+
+NesSuggestContext _$NesSuggestContextFromJson(Map<String, dynamic> json) =>
+    NesSuggestContext(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      recentFiles: (json['recentFiles'] as List<dynamic>?)
+          ?.map((e) => NesRecentFile.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      relatedSnippets: (json['relatedSnippets'] as List<dynamic>?)
+          ?.map((e) => NesRelatedSnippet.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      editHistory: (json['editHistory'] as List<dynamic>?)
+          ?.map((e) => NesEditHistoryEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      userActions: (json['userActions'] as List<dynamic>?)
+          ?.map((e) => NesUserAction.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      openFiles: (json['openFiles'] as List<dynamic>?)
+          ?.map((e) => NesOpenFile.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      diagnostics: (json['diagnostics'] as List<dynamic>?)
+          ?.map((e) => NesDiagnostic.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$NesSuggestContextToJson(NesSuggestContext instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'recentFiles': instance.recentFiles,
+      'relatedSnippets': instance.relatedSnippets,
+      'editHistory': instance.editHistory,
+      'userActions': instance.userActions,
+      'openFiles': instance.openFiles,
+      'diagnostics': instance.diagnostics,
+    };
+
+NesEditSuggestion _$NesEditSuggestionFromJson(Map<String, dynamic> json) =>
+    NesEditSuggestion(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      id: json['id'] as String,
+      uri: json['uri'] as String,
+      edits: (json['edits'] as List<dynamic>)
+          .map((e) => NesTextEdit.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      cursorPosition: json['cursorPosition'] == null
+          ? null
+          : Position.fromJson(json['cursorPosition'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$NesEditSuggestionToJson(NesEditSuggestion instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'id': instance.id,
+      'uri': instance.uri,
+      'edits': instance.edits,
+      'cursorPosition': instance.cursorPosition,
+    };
+
+NesJumpSuggestion _$NesJumpSuggestionFromJson(Map<String, dynamic> json) =>
+    NesJumpSuggestion(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      id: json['id'] as String,
+      uri: json['uri'] as String,
+      position: Position.fromJson(json['position'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$NesJumpSuggestionToJson(NesJumpSuggestion instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'id': instance.id,
+      'uri': instance.uri,
+      'position': instance.position,
+    };
+
+NesRenameSuggestion _$NesRenameSuggestionFromJson(Map<String, dynamic> json) =>
+    NesRenameSuggestion(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      id: json['id'] as String,
+      uri: json['uri'] as String,
+      position: Position.fromJson(json['position'] as Map<String, dynamic>),
+      newName: json['newName'] as String,
+    );
+
+Map<String, dynamic> _$NesRenameSuggestionToJson(
+  NesRenameSuggestion instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'id': instance.id,
+  'uri': instance.uri,
+  'position': instance.position,
+  'newName': instance.newName,
+};
+
+NesSearchAndReplaceSuggestion _$NesSearchAndReplaceSuggestionFromJson(
+  Map<String, dynamic> json,
+) => NesSearchAndReplaceSuggestion(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  id: json['id'] as String,
+  uri: json['uri'] as String,
+  search: json['search'] as String,
+  replace: json['replace'] as String,
+  isRegex: json['isRegex'] as bool?,
+);
+
+Map<String, dynamic> _$NesSearchAndReplaceSuggestionToJson(
+  NesSearchAndReplaceSuggestion instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'id': instance.id,
+  'uri': instance.uri,
+  'search': instance.search,
+  'replace': instance.replace,
+  'isRegex': instance.isRegex,
+};
+
+UnknownNesSuggestion _$UnknownNesSuggestionFromJson(
+  Map<String, dynamic> json,
+) => UnknownNesSuggestion(rawJson: json['rawJson'] as Map<String, dynamic>);
+
+Map<String, dynamic> _$UnknownNesSuggestionToJson(
+  UnknownNesSuggestion instance,
+) => <String, dynamic>{'rawJson': instance.rawJson};
+
+NesJumpCapabilities _$NesJumpCapabilitiesFromJson(Map<String, dynamic> json) =>
+    NesJumpCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesJumpCapabilitiesToJson(
+  NesJumpCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesRenameCapabilities _$NesRenameCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesRenameCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesRenameCapabilitiesToJson(
+  NesRenameCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesSearchAndReplaceCapabilities _$NesSearchAndReplaceCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesSearchAndReplaceCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesSearchAndReplaceCapabilitiesToJson(
+  NesSearchAndReplaceCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesRecentFilesCapabilities _$NesRecentFilesCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesRecentFilesCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesRecentFilesCapabilitiesToJson(
+  NesRecentFilesCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesRelatedSnippetsCapabilities _$NesRelatedSnippetsCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesRelatedSnippetsCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesRelatedSnippetsCapabilitiesToJson(
+  NesRelatedSnippetsCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesEditHistoryCapabilities _$NesEditHistoryCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesEditHistoryCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesEditHistoryCapabilitiesToJson(
+  NesEditHistoryCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesUserActionsCapabilities _$NesUserActionsCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesUserActionsCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesUserActionsCapabilitiesToJson(
+  NesUserActionsCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesOpenFilesCapabilities _$NesOpenFilesCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesOpenFilesCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesOpenFilesCapabilitiesToJson(
+  NesOpenFilesCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDiagnosticsCapabilities _$NesDiagnosticsCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDiagnosticsCapabilities(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$NesDiagnosticsCapabilitiesToJson(
+  NesDiagnosticsCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDocumentDidOpenCapabilities _$NesDocumentDidOpenCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDocumentDidOpenCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesDocumentDidOpenCapabilitiesToJson(
+  NesDocumentDidOpenCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDocumentDidChangeCapabilities _$NesDocumentDidChangeCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDocumentDidChangeCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesDocumentDidChangeCapabilitiesToJson(
+  NesDocumentDidChangeCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDocumentDidCloseCapabilities _$NesDocumentDidCloseCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDocumentDidCloseCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesDocumentDidCloseCapabilitiesToJson(
+  NesDocumentDidCloseCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDocumentDidSaveCapabilities _$NesDocumentDidSaveCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDocumentDidSaveCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesDocumentDidSaveCapabilitiesToJson(
+  NesDocumentDidSaveCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDocumentDidFocusCapabilities _$NesDocumentDidFocusCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDocumentDidFocusCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+);
+
+Map<String, dynamic> _$NesDocumentDidFocusCapabilitiesToJson(
+  NesDocumentDidFocusCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta};
+
+NesDocumentEventCapabilities _$NesDocumentEventCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesDocumentEventCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  didOpen: json['didOpen'] == null
+      ? null
+      : NesDocumentDidOpenCapabilities.fromJson(
+          json['didOpen'] as Map<String, dynamic>,
+        ),
+  didChange: json['didChange'] == null
+      ? null
+      : NesDocumentDidChangeCapabilities.fromJson(
+          json['didChange'] as Map<String, dynamic>,
+        ),
+  didClose: json['didClose'] == null
+      ? null
+      : NesDocumentDidCloseCapabilities.fromJson(
+          json['didClose'] as Map<String, dynamic>,
+        ),
+  didSave: json['didSave'] == null
+      ? null
+      : NesDocumentDidSaveCapabilities.fromJson(
+          json['didSave'] as Map<String, dynamic>,
+        ),
+  didFocus: json['didFocus'] == null
+      ? null
+      : NesDocumentDidFocusCapabilities.fromJson(
+          json['didFocus'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$NesDocumentEventCapabilitiesToJson(
+  NesDocumentEventCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'didOpen': instance.didOpen,
+  'didChange': instance.didChange,
+  'didClose': instance.didClose,
+  'didSave': instance.didSave,
+  'didFocus': instance.didFocus,
+};
+
+NesEventCapabilities _$NesEventCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesEventCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  document: json['document'] == null
+      ? null
+      : NesDocumentEventCapabilities.fromJson(
+          json['document'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$NesEventCapabilitiesToJson(
+  NesEventCapabilities instance,
+) => <String, dynamic>{'_meta': ?instance.meta, 'document': instance.document};
+
+NesContextCapabilities _$NesContextCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => NesContextCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  recentFiles: json['recentFiles'] == null
+      ? null
+      : NesRecentFilesCapabilities.fromJson(
+          json['recentFiles'] as Map<String, dynamic>,
+        ),
+  relatedSnippets: json['relatedSnippets'] == null
+      ? null
+      : NesRelatedSnippetsCapabilities.fromJson(
+          json['relatedSnippets'] as Map<String, dynamic>,
+        ),
+  editHistory: json['editHistory'] == null
+      ? null
+      : NesEditHistoryCapabilities.fromJson(
+          json['editHistory'] as Map<String, dynamic>,
+        ),
+  userActions: json['userActions'] == null
+      ? null
+      : NesUserActionsCapabilities.fromJson(
+          json['userActions'] as Map<String, dynamic>,
+        ),
+  openFiles: json['openFiles'] == null
+      ? null
+      : NesOpenFilesCapabilities.fromJson(
+          json['openFiles'] as Map<String, dynamic>,
+        ),
+  diagnostics: json['diagnostics'] == null
+      ? null
+      : NesDiagnosticsCapabilities.fromJson(
+          json['diagnostics'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$NesContextCapabilitiesToJson(
+  NesContextCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'recentFiles': instance.recentFiles,
+  'relatedSnippets': instance.relatedSnippets,
+  'editHistory': instance.editHistory,
+  'userActions': instance.userActions,
+  'openFiles': instance.openFiles,
+  'diagnostics': instance.diagnostics,
+};
+
+NesCapabilities _$NesCapabilitiesFromJson(Map<String, dynamic> json) =>
+    NesCapabilities(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      events: json['events'] == null
+          ? null
+          : NesEventCapabilities.fromJson(
+              json['events'] as Map<String, dynamic>,
+            ),
+      context: json['context'] == null
+          ? null
+          : NesContextCapabilities.fromJson(
+              json['context'] as Map<String, dynamic>,
+            ),
+    );
+
+Map<String, dynamic> _$NesCapabilitiesToJson(NesCapabilities instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'events': instance.events,
+      'context': instance.context,
+    };
+
+ClientNesCapabilities _$ClientNesCapabilitiesFromJson(
+  Map<String, dynamic> json,
+) => ClientNesCapabilities(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  jump: json['jump'] == null
+      ? null
+      : NesJumpCapabilities.fromJson(json['jump'] as Map<String, dynamic>),
+  rename: json['rename'] == null
+      ? null
+      : NesRenameCapabilities.fromJson(json['rename'] as Map<String, dynamic>),
+  searchAndReplace: json['searchAndReplace'] == null
+      ? null
+      : NesSearchAndReplaceCapabilities.fromJson(
+          json['searchAndReplace'] as Map<String, dynamic>,
+        ),
+);
+
+Map<String, dynamic> _$ClientNesCapabilitiesToJson(
+  ClientNesCapabilities instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'jump': instance.jump,
+  'rename': instance.rename,
+  'searchAndReplace': instance.searchAndReplace,
+};
+
+StartNesRequest _$StartNesRequestFromJson(Map<String, dynamic> json) =>
+    StartNesRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      workspaceUri: json['workspaceUri'] as String?,
+      workspaceFolders: (json['workspaceFolders'] as List<dynamic>?)
+          ?.map((e) => WorkspaceFolder.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      repository: json['repository'] == null
+          ? null
+          : NesRepository.fromJson(json['repository'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$StartNesRequestToJson(StartNesRequest instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'workspaceUri': instance.workspaceUri,
+      'workspaceFolders': instance.workspaceFolders,
+      'repository': instance.repository,
+    };
+
+StartNesResponse _$StartNesResponseFromJson(Map<String, dynamic> json) =>
+    StartNesResponse(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      sessionId: json['sessionId'] as String,
+    );
+
+Map<String, dynamic> _$StartNesResponseToJson(StartNesResponse instance) =>
+    <String, dynamic>{'_meta': ?instance.meta, 'sessionId': instance.sessionId};
+
+SuggestNesRequest _$SuggestNesRequestFromJson(Map<String, dynamic> json) =>
+    SuggestNesRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      sessionId: json['sessionId'] as String,
+      uri: json['uri'] as String,
+      version: (json['version'] as num).toInt(),
+      position: Position.fromJson(json['position'] as Map<String, dynamic>),
+      selection: json['selection'] == null
+          ? null
+          : Range.fromJson(json['selection'] as Map<String, dynamic>),
+      triggerKind: $enumDecode(_$NesTriggerKindEnumMap, json['triggerKind']),
+      context: json['context'] == null
+          ? null
+          : NesSuggestContext.fromJson(json['context'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$SuggestNesRequestToJson(SuggestNesRequest instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'sessionId': instance.sessionId,
+      'uri': instance.uri,
+      'version': instance.version,
+      'position': instance.position,
+      'selection': instance.selection,
+      'triggerKind': _$NesTriggerKindEnumMap[instance.triggerKind]!,
+      'context': instance.context,
+    };
+
+const _$NesTriggerKindEnumMap = {
+  NesTriggerKind.automatic: 'automatic',
+  NesTriggerKind.diagnostic: 'diagnostic',
+  NesTriggerKind.manual: 'manual',
+};
+
+SuggestNesResponse _$SuggestNesResponseFromJson(Map<String, dynamic> json) =>
+    SuggestNesResponse(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      suggestions: const NesSuggestionListConverter().fromJson(
+        json['suggestions'] as List,
+      ),
+    );
+
+Map<String, dynamic> _$SuggestNesResponseToJson(SuggestNesResponse instance) =>
+    <String, dynamic>{
+      '_meta': ?instance.meta,
+      'suggestions': const NesSuggestionListConverter().toJson(
+        instance.suggestions,
+      ),
+    };
+
+AcceptNesNotification _$AcceptNesNotificationFromJson(
+  Map<String, dynamic> json,
+) => AcceptNesNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  id: json['id'] as String,
+);
+
+Map<String, dynamic> _$AcceptNesNotificationToJson(
+  AcceptNesNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'id': instance.id,
+};
+
+RejectNesNotification _$RejectNesNotificationFromJson(
+  Map<String, dynamic> json,
+) => RejectNesNotification(
+  meta: json['_meta'] as Map<String, dynamic>?,
+  sessionId: json['sessionId'] as String,
+  id: json['id'] as String,
+  reason: $enumDecodeNullable(_$NesRejectReasonEnumMap, json['reason']),
+);
+
+Map<String, dynamic> _$RejectNesNotificationToJson(
+  RejectNesNotification instance,
+) => <String, dynamic>{
+  '_meta': ?instance.meta,
+  'sessionId': instance.sessionId,
+  'id': instance.id,
+  'reason': _$NesRejectReasonEnumMap[instance.reason],
+};
+
+const _$NesRejectReasonEnumMap = {
+  NesRejectReason.rejected: 'rejected',
+  NesRejectReason.ignored: 'ignored',
+  NesRejectReason.replaced: 'replaced',
+  NesRejectReason.cancelled: 'cancelled',
+};
+
+CloseNesRequest _$CloseNesRequestFromJson(Map<String, dynamic> json) =>
+    CloseNesRequest(
+      meta: json['_meta'] as Map<String, dynamic>?,
+      sessionId: json['sessionId'] as String,
+    );
+
+Map<String, dynamic> _$CloseNesRequestToJson(CloseNesRequest instance) =>
+    <String, dynamic>{'_meta': ?instance.meta, 'sessionId': instance.sessionId};
+
+CloseNesResponse _$CloseNesResponseFromJson(Map<String, dynamic> json) =>
+    CloseNesResponse(meta: json['_meta'] as Map<String, dynamic>?);
+
+Map<String, dynamic> _$CloseNesResponseToJson(CloseNesResponse instance) =>
+    <String, dynamic>{'_meta': ?instance.meta};
