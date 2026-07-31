@@ -41,10 +41,11 @@
 /// }
 /// ```
 
+library;
+
 import 'package:collection/collection.dart';
 
 import 'elicitation_converters.dart';
-import 'nes_converters.dart';
 
 import 'schema.dart';
 
